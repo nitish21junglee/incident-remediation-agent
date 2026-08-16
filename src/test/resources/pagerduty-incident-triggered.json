@@ -1,0 +1,16 @@
+{
+  "event": {
+    "id": "01JDEMOEVENT",
+    "event_type": "incident.triggered",
+    "occurred_at": "2026-08-14T02:14:00Z",
+    "data": {
+      "id": "PINCIDENT",
+      "title": "demo-api error rate increased",
+      "html_url": "https://example.pagerduty.com/incidents/PINCIDENT",
+      "service": {
+        "id": "PDEMO",
+        "summary": "demo-api"
+      }
+    }
+  }
+}
