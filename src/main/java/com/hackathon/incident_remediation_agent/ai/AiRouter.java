@@ -3,6 +3,7 @@ package com.hackathon.incident_remediation_agent.ai;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,24 +29,47 @@ public class AiRouter {
     private static final Logger log = LoggerFactory.getLogger(AiRouter.class);
 
     private final AiFixClient aiFixClient;
+    private final AiRepositorySelector repositorySelector;
     private final RepositoryContextReader contextReader;
     private final RepositoryResolver repositories;
 
-    AiRouter(AiFixClient aiFixClient, RepositoryContextReader contextReader,
-             RepositoryResolver repositories) {
+    AiRouter(AiFixClient aiFixClient, AiRepositorySelector repositorySelector,
+             RepositoryContextReader contextReader, RepositoryResolver repositories) {
         this.aiFixClient = aiFixClient;
+        this.repositorySelector = repositorySelector;
         this.contextReader = contextReader;
         this.repositories = repositories;
     }
 
-    public Optional<FixProposal> route(EvidencePack pack) {
+    public Optional<RoutedFix> route(EvidencePack pack) {
         String ineligible = ineligibilityReason(pack);
         if (ineligible != null) {
             log.info("Skipping AI investigation: {}", ineligible);
             return Optional.empty();
         }
 
-        AgentProperties.RepositoryTarget target = this.repositories.resolve(pack.alert()).orElseThrow();
+        Set<String> allowed = this.repositories.allowedRepositories();
+        if (allowed.isEmpty()) {
+            log.warn("No repositories are configured; skipping code investigation");
+            return Optional.empty();
+        }
+
+        Optional<String> chosen = this.repositorySelector.select(pack, allowed);
+        if (chosen.isEmpty()) {
+            log.info("Evidence did not point at a repository for {}", pack.ticket().key());
+            return Optional.empty();
+        }
+
+        // The choice is validated against the allowlist before anything is read or cloned, so a
+        // hallucinated or injected name cannot widen what the agent can reach.
+        Optional<AgentProperties.RepositoryTarget> resolved =
+            this.repositories.resolveByName(chosen.get());
+        if (resolved.isEmpty()) {
+            log.warn("Chosen repository '{}' is not allowlisted; skipping", chosen.get());
+            return Optional.empty();
+        }
+        AgentProperties.RepositoryTarget target = resolved.get();
+
         Map<String, String> repositoryFiles = this.contextReader.read(
             Path.of(target.directory()), target.contextFiles());
 
@@ -58,7 +82,7 @@ public class AiRouter {
             log.info("Model returned a probable fix with no diff for {}", pack.ticket().key());
             return Optional.empty();
         }
-        return Optional.of(proposal);
+        return Optional.of(new RoutedFix(chosen.get(), proposal));
     }
 
     /**
@@ -78,10 +102,6 @@ public class AiRouter {
             return "no top error in the logs";
         }
 
-        // Deterministic lookup on the service id; never inferred from incident or log text.
-        if (this.repositories.resolve(pack.alert()).isEmpty()) {
-            return "no repository mapped for service " + pack.alert().serviceId();
-        }
         return null;
     }
 

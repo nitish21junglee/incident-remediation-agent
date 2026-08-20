@@ -8,6 +8,10 @@ import java.util.Arrays;
  */
 public enum AiTask {
 
+    /** Reads the evidence and picks which allowlisted repository owns the failure. */
+    REPOSITORY_SELECTION("repository-selection"),
+
+    /** Produces the hypothesis and unified diff for the chosen repository. */
     FIX_PROPOSAL("fix-proposal");
 
     private final String key;

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +43,8 @@ class AiRouterTest {
 
     private AiFixClient aiFixClient;
 
+    private AiRepositorySelector repositorySelector;
+
     private AiRouter router;
 
     @BeforeEach
@@ -49,18 +52,41 @@ class AiRouterTest {
         Files.createDirectories(repository.resolve("src/main/java"));
         Files.writeString(repository.resolve(CONTEXT_FILE), "class Mapper {}");
         this.aiFixClient = mock(AiFixClient.class);
+        this.repositorySelector = (pack, allowed) ->
+            allowed.contains("demo-api") ? Optional.of("demo-api") : Optional.empty();
         this.router = routerMapping("PDEMO");
     }
 
     @Test
-    void requestsAFixForApplicationErrors() {
+    void requestsAFixForTheRepositoryTheModelChose() {
         when(aiFixClient.propose(any(), anyMap())).thenReturn(PROPOSAL);
 
-        Optional<FixProposal> proposal = router.route(pack("application_error"));
+        Optional<RoutedFix> routed = router.route(pack("application_error"));
 
-        assertThat(proposal).contains(PROPOSAL);
+        assertThat(routed).isPresent();
+        assertThat(routed.get().repositoryName()).isEqualTo("demo-api");
+        assertThat(routed.get().proposal()).isEqualTo(PROPOSAL);
         verify(aiFixClient).propose(any(EvidencePack.class),
             eqMap(Map.of(CONTEXT_FILE, "class Mapper {}")));
+    }
+
+    /** The model's choice is validated against the allowlist before anything is read. */
+    @Test
+    void skipsWhenTheModelChoosesARepositoryOutsideTheAllowlist() {
+        this.repositorySelector = (pack, allowed) -> Optional.of("someone-elses-repo");
+        this.router = routerMapping("PDEMO");
+
+        assertThat(router.route(pack("application_error"))).isEmpty();
+        verifyNoAiCall();
+    }
+
+    @Test
+    void skipsWhenTheEvidenceDoesNotPointAtARepository() {
+        this.repositorySelector = (pack, allowed) -> Optional.empty();
+        this.router = routerMapping("PDEMO");
+
+        assertThat(router.route(pack("application_error"))).isEmpty();
+        verifyNoAiCall();
     }
 
     @Test
@@ -94,10 +120,17 @@ class AiRouterTest {
     }
 
     /** An unmapped service must not fall back to some other repository. */
+    /**
+     * The service-to-repository mapping is only a hint now. With the selector deciding, an
+     * unmapped service no longer blocks the investigation.
+     */
     @Test
-    void skipsWhenNoRepositoryIsMappedForTheService() {
-        assertThat(routerMapping("PSOMETHINGELSE").route(pack("application_error"))).isEmpty();
-        verifyNoAiCall();
+    void proceedsWhenTheServiceHasNoConfiguredOwner() {
+        when(aiFixClient.propose(any(), anyMap())).thenReturn(PROPOSAL);
+
+        assertThat(routerMapping("PSOMETHINGELSE").route(pack("application_error")))
+            .map(RoutedFix::repositoryName)
+            .contains("demo-api");
     }
 
     @Test
@@ -139,7 +172,7 @@ class AiRouterTest {
                     "acme/demo-api", "main", repository.toString(),
                     List.of(CONTEXT_FILE), List.of("true"))),
                 Map.of(mappedServiceId, "demo-api")));
-        return new AiRouter(aiFixClient, new RepositoryContextReader(),
+        return new AiRouter(aiFixClient, repositorySelector, new RepositoryContextReader(),
             new RepositoryResolver(properties));
     }
 

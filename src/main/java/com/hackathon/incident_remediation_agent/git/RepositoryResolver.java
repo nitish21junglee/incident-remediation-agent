@@ -77,6 +77,15 @@ public class RepositoryResolver {
         return Optional.of(target);
     }
 
+    /**
+     * The configured owner of a service, when one is mapped. This is a hint for whoever chooses
+     * the repository; it does not by itself grant access, since {@link #resolveByName} still
+     * checks the allowlist.
+     */
+    public Optional<String> repositoryNameFor(IncidentAlert alert) {
+        return Optional.ofNullable(this.repositoryNameByServiceId.get(upper(alert.serviceId())));
+    }
+
     /** @return every repository the agent is permitted to touch */
     public Set<String> allowedRepositories() {
         return Set.copyOf(this.byName.keySet());
