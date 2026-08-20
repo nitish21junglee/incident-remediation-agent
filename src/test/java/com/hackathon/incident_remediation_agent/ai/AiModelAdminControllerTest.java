@@ -16,6 +16,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
@@ -43,6 +44,22 @@ class AiModelAdminControllerTest {
 
     @Autowired
     MockMvc mockMvc;
+
+    @MockitoBean
+    AiModelCatalogue catalogue;
+
+    @Test
+    void listsAvailableModelsForThePicker() throws Exception {
+        org.mockito.Mockito.when(catalogue.list()).thenReturn(List.of(
+            new AvailableModel("gemini-2.5-flash", true),
+            new AvailableModel("veo-3.1-generate-preview", false)));
+
+        mockMvc.perform(get("/admin/ai/models/available"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value("gemini-2.5-flash"))
+            .andExpect(jsonPath("$[0].recommended").value(true))
+            .andExpect(jsonPath("$[1].recommended").value(false));
+    }
 
     @Test
     void reportsTheEffectiveChains() throws Exception {

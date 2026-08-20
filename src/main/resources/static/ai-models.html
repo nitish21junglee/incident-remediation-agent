@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>AI model selection</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+    max-width: 46rem; margin: 3rem auto; padding: 0 1.5rem;
+  }
+  h1 { font-size: 1.25rem; font-weight: 600; margin-bottom: .25rem; }
+  p.sub { margin-top: 0; opacity: .65; }
+  fieldset { border: 1px solid color-mix(in srgb, currentColor 20%, transparent); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  legend { font-weight: 600; padding: 0 .4rem; }
+  label { display: block; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; opacity: .65; margin-bottom: .3rem; }
+  select, button { font: inherit; padding: .45rem .6rem; border-radius: 6px; }
+  select { width: 100%; }
+  .row { display: flex; gap: .6rem; align-items: end; margin-bottom: .9rem; }
+  .row > div { flex: 1; }
+  .chain { font-family: ui-monospace, monospace; font-size: .85rem; opacity: .8; }
+  .warn { border-left: 3px solid #c93; padding-left: .75rem; font-size: .85rem; opacity: .8; }
+  #status { min-height: 1.4rem; font-size: .875rem; }
+</style>
+</head>
+<body>
+
+<h1>AI model selection</h1>
+<p class="sub">Pick the model each task runs on. Changes apply immediately and are lost on restart.</p>
+
+<p class="warn">
+  This page is unauthenticated. It can only change model names &mdash; not the provider URL or API key.
+</p>
+
+<div id="tasks"></div>
+
+<p id="status"></p>
+
+<script>
+const statusEl = document.getElementById('status');
+
+function say(message, ok = true) {
+  statusEl.textContent = message;
+  statusEl.style.color = ok ? 'inherit' : '#c33';
+}
+
+async function json(url, options) {
+  const response = await fetch(url, options);
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`${response.status} ${detail}`);
+  }
+  return response.json();
+}
+
+// A task's chain is ordered: the adapter tries the primary, then the fallback.
+function optionsFor(models, selected) {
+  const group = (label, list) => list.length
+    ? `<optgroup label="${label}">` + list.map(m =>
+        `<option value="${m.id}"${m.id === selected ? ' selected' : ''}>${m.id}</option>`).join('') + '</optgroup>'
+    : '';
+  return group('Suitable for text', models.filter(m => m.recommended))
+       + group('Other modalities', models.filter(m => !m.recommended));
+}
+
+async function render() {
+  const [available, current] = await Promise.all([
+    json('/admin/ai/models/available'),
+    json('/admin/ai/models'),
+  ]);
+
+  document.getElementById('tasks').innerHTML = Object.entries(current).map(([task, chain]) => `
+    <fieldset data-task="${task}">
+      <legend>${task}</legend>
+      <div class="row">
+        <div>
+          <label for="primary-${task}">Primary</label>
+          <select id="primary-${task}">${optionsFor(available, chain[0])}</select>
+        </div>
+        <div>
+          <label for="fallback-${task}">Fallback (optional)</label>
+          <select id="fallback-${task}">
+            <option value="">none</option>
+            ${optionsFor(available, chain[1])}
+          </select>
+        </div>
+        <button type="button" data-save="${task}">Apply</button>
+        <button type="button" data-reset="${task}">Reset</button>
+      </div>
+      <div class="chain">current: ${chain.join(' &rarr; ')}</div>
+    </fieldset>`).join('');
+
+  document.querySelectorAll('[data-save]').forEach(button =>
+    button.addEventListener('click', () => apply(button.dataset.save)));
+  document.querySelectorAll('[data-reset]').forEach(button =>
+    button.addEventListener('click', () => reset(button.dataset.reset)));
+}
+
+async function apply(task) {
+  const models = [
+    document.getElementById(`primary-${task}`).value,
+    document.getElementById(`fallback-${task}`).value,
+  ].filter(Boolean);
+
+  try {
+    await json(`/admin/ai/models/${task}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ models }),
+    });
+    say(`${task} now runs on ${models.join(' → ')}`);
+    await render();
+  } catch (error) {
+    say(String(error.message), false);
+  }
+}
+
+async function reset(task) {
+  try {
+    const response = await fetch(`/admin/ai/models/${task}`, { method: 'DELETE' });
+    if (!response.ok) throw new Error(`${response.status}`);
+    say(`${task} reverted to configuration`);
+    await render();
+  } catch (error) {
+    say(String(error.message), false);
+  }
+}
+
+render().catch(error => say(`Could not load models: ${error.message}`, false));
+</script>
+
+</body>
+</html>

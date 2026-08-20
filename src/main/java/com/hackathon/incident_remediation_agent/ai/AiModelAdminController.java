@@ -28,14 +28,22 @@ import org.springframework.web.server.ResponseStatusException;
 public class AiModelAdminController {
 
     private final AiModelSelector selector;
+    private final AiModelCatalogue catalogue;
 
-    AiModelAdminController(AiModelSelector selector) {
+    AiModelAdminController(AiModelSelector selector, AiModelCatalogue catalogue) {
         this.selector = selector;
+        this.catalogue = catalogue;
     }
 
     @GetMapping
     Map<String, List<String>> current() {
         return this.selector.snapshot();
+    }
+
+    /** Everything the configured key can reach, so the picker offers real choices. */
+    @GetMapping("/available")
+    List<AvailableModel> available() {
+        return this.catalogue.list();
     }
 
     @PutMapping("/{task}")
