@@ -28,15 +28,21 @@ public class JiraDocumentFactory {
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
     public JsonNode initialDescription(IncidentAlert alert) {
-        ObjectNode document = document();
-        ArrayNode blocks = document.withArray("content");
+        ObjectNode document = NODES.objectNode();
+        document.put("version", 1);
+        document.put("type", "doc");
+        ArrayNode blocks = document.putArray("content");
 
-        ArrayNode summary = paragraph(blocks);
-        summary.add(text("PagerDuty incident "));
-        summary.add(link(alert.incidentId(), alert.incidentUrl()));
-        summary.add(text(" triggered at %s.".formatted(alert.triggeredAt())));
+        paragraph(blocks).add(text("Created automatically from a PagerDuty incident."));
 
-        paragraph(blocks).add(text("Service: " + alert.serviceId()));
+        ArrayNode facts = bulletList(blocks);
+        fact(facts, "Incident", alert.incidentId());
+        fact(facts, "Title", alert.title());
+        fact(facts, "Service", alert.serviceId());
+        fact(facts, "Triggered", alert.triggeredAt().toString());
+        fact(facts, "Event", alert.eventId());
+
+        paragraph(blocks).add(link("View incident in PagerDuty", alert.incidentUrl()));
 
         return document;
     }
@@ -62,20 +68,32 @@ public class JiraDocumentFactory {
         throw new UnsupportedOperationException("Task 9: implement validationFailureMessage");
     }
 
-    /** An empty ADF root. Jira rejects any {@code version} other than 1. */
-    private static ObjectNode document() {
-        ObjectNode document = NODES.objectNode();
-        document.put("version", 1);
-        document.put("type", "doc");
-        document.putArray("content");
-        return document;
-    }
-
     /** Appends an empty paragraph block and returns its inline content array. */
     private static ArrayNode paragraph(ArrayNode blocks) {
         ObjectNode paragraph = blocks.addObject();
         paragraph.put("type", "paragraph");
         return paragraph.putArray("content");
+    }
+
+    private static ArrayNode bulletList(ArrayNode blocks) {
+        ObjectNode list = blocks.addObject();
+        list.put("type", "bulletList");
+        return list.putArray("content");
+    }
+
+    /** Appends a "<label>: <value>" bullet with the label in bold. */
+    private static void fact(ArrayNode items, String label, String value) {
+        ObjectNode item = items.addObject();
+        item.put("type", "listItem");
+        ArrayNode inline = paragraph(item.putArray("content"));
+        inline.add(strong(label + ": "));
+        inline.add(text(value));
+    }
+
+    private static ObjectNode strong(String value) {
+        ObjectNode node = text(value);
+        node.putArray("marks").addObject().put("type", "strong");
+        return node;
     }
 
     private static ObjectNode text(String value) {

@@ -62,7 +62,7 @@ class RestJiraClientTest {
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
             .andExpect(jsonPath("$.fields.project.key").value("HACK"))
             .andExpect(jsonPath("$.fields.issuetype.name").value("Task"))
-            .andExpect(jsonPath("$.fields.summary").value("[PagerDuty] demo-api error rate increased"))
+            .andExpect(jsonPath("$.fields.summary").value("demo-api error rate increased"))
             .andExpect(jsonPath("$.fields.description.version").value(1))
             .andExpect(jsonPath("$.fields.description.type").value("doc"))
             .andExpect(jsonPath("$.fields.labels").value(containsInAnyOrder("pagerduty", "ai-triage")))

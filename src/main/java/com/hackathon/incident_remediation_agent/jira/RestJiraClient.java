@@ -56,7 +56,7 @@ public class RestJiraClient implements JiraClient {
         ObjectNode fields = NODES.objectNode();
         fields.putObject("project").put("key", this.projectKey);
         fields.putObject("issuetype").put("name", this.issueType);
-        fields.put("summary", "[PagerDuty] " + alert.title());
+        fields.put("summary", alert.title());
         fields.set("description", this.documents.initialDescription(alert));
         ArrayNode labels = fields.putArray("labels");
         LABELS.forEach(labels::add);

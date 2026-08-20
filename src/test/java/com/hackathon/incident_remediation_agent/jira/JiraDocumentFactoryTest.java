@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,14 +36,17 @@ class JiraDocumentFactoryTest {
         assertThat(document.get("content").isEmpty()).isFalse();
     }
 
+    /** Every field the webhook parser extracts must survive into the ticket. */
     @Test
-    void initialDescriptionStatesIncidentServiceAndTriggerTime() {
+    void initialDescriptionCarriesEveryIncidentField() {
         JsonNode document = factory.initialDescription(alert);
 
         assertThat(flattenText(document))
             .contains("PINCIDENT")
+            .contains("demo-api error rate increased")
             .contains("PDEMO")
-            .contains("2026-08-14T02:14:00Z");
+            .contains("2026-08-14T02:14:00Z")
+            .contains("01JDEMOEVENT");
     }
 
     @Test
@@ -54,19 +59,41 @@ class JiraDocumentFactoryTest {
     }
 
     @Test
-    void initialDescriptionBuildsOnlyParagraphsOfTextNodes() {
+    void initialDescriptionListsIncidentFactsAsBullets() {
         JsonNode document = factory.initialDescription(alert);
 
-        assertThat(document.get("content"))
-            .allSatisfy(block -> assertThat(block.get("type").asString()).isEqualTo("paragraph"));
-        assertThat(document.get("content"))
-            .allSatisfy(block -> assertThat(block.get("content"))
-                .allSatisfy(inline -> assertThat(inline.get("type").asString()).isEqualTo("text")));
+        JsonNode bullets = blocks(document).stream()
+            .filter(block -> "bulletList".equals(block.get("type").asString()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("no bulletList block"));
+
+        assertThat(bullets.get("content")).hasSize(5);
+        assertThat(bullets.get("content"))
+            .allSatisfy(item -> assertThat(item.get("type").asString()).isEqualTo("listItem"));
+        assertThat(flattenText(bullets))
+            .contains("Incident: ")
+            .contains("Service: ")
+            .contains("Triggered: ")
+            .contains("Event: ");
     }
 
-    /** Concatenates every ADF text node so assertions do not depend on paragraph layout. */
-    private static String flattenText(JsonNode document) {
-        return document.findValues("text").stream()
+    /** Jira silently drops blocks its editor does not recognise, so keep to the two we use. */
+    @Test
+    void initialDescriptionUsesOnlyParagraphAndBulletBlocks() {
+        JsonNode document = factory.initialDescription(alert);
+
+        assertThat(blocks(document))
+            .allSatisfy(block -> assertThat(block.get("type").asString())
+                .isIn("paragraph", "bulletList"));
+    }
+
+    private static List<JsonNode> blocks(JsonNode document) {
+        return StreamSupport.stream(document.get("content").spliterator(), false).toList();
+    }
+
+    /** Concatenates every ADF text node so assertions do not depend on block layout. */
+    private static String flattenText(JsonNode node) {
+        return node.findValues("text").stream()
             .filter(JsonNode::isString)
             .map(JsonNode::asString)
             .collect(Collectors.joining(" "));
