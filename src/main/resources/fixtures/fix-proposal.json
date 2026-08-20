@@ -1,0 +1,6 @@
+{
+  "probableFix": true,
+  "hypothesis": "PaymentMapper dereferences a missing optional payment type.",
+  "summary": "Handle missing payment type",
+  "unifiedDiff": "diff --git a/src/main/java/com/example/demo/PaymentMapper.java b/src/main/java/com/example/demo/PaymentMapper.java\n--- a/src/main/java/com/example/demo/PaymentMapper.java\n+++ b/src/main/java/com/example/demo/PaymentMapper.java\n@@ -44,1 +44,1 @@\n-        return payment.getType().name();\n+        return payment.getType() == null ? \"UNKNOWN\" : payment.getType().name();\n"
+}
