@@ -13,7 +13,7 @@ public record AgentProperties(
     Splunk splunk,
     SignalFx signalfx,
     Deployment deployment,
-    OpenAi openai,
+    Ai ai,
     GitHub github
 ) {
 
@@ -25,7 +25,7 @@ public record AgentProperties(
 
     public record Deployment(String version, String commitSha, String commitUrl, Instant deployedAt) {}
 
-    public record OpenAi(String baseUrl, String apiKey, String model) {}
+    public record Ai(String baseUrl, String apiKey, String model) {}
 
     public record GitHub(
         String apiBaseUrl,

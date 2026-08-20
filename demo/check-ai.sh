@@ -12,10 +12,10 @@
 #
 set -uo pipefail
 
-: "${OPENAI_BASE_URL:?set OPENAI_BASE_URL}"
-: "${OPENAI_API_KEY:?set OPENAI_API_KEY}"
+: "${AI_BASE_URL:?set AI_BASE_URL}"
+: "${AI_API_KEY:?set AI_API_KEY}"
 
-BASE="${OPENAI_BASE_URL%/}"
+BASE="${AI_BASE_URL%/}"
 
 failures=0
 pass() { printf '  \033[32mOK\033[0m    %s\n' "$1"; }
@@ -25,7 +25,7 @@ fail() { printf '  \033[31mFAIL\033[0m  %s\n' "$1"; failures=$((failures + 1)); 
 api() {
     local method="$1" path="$2" data="${3-}"
     {
-        printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY"
+        printf 'header = "Authorization: Bearer %s"\n' "$AI_API_KEY"
         printf 'request = "%s"\n' "$method"
         printf 'header = "Content-Type: application/json"\n'
         [ -n "$data" ] && printf 'data = "%s"\n' "$(printf '%s' "$data" | sed 's/\\/\\\\/g; s/"/\\"/g')"
@@ -59,12 +59,12 @@ body "$response" | jq -r '.data[]?.id' | sed 's|^models/||' | sort | sed 's/^/  
 
 # ---------------------------------------------------------------- 2. schema-constrained call
 # The fix client needs structured output, not just any completion, so exercise that directly.
-MODEL="${OPENAI_MODEL:-$(body "$response" | jq -r '[.data[]?.id | sub("^models/";"")]
+MODEL="${AI_MODEL:-$(body "$response" | jq -r '[.data[]?.id | sub("^models/";"")]
     | map(select(test("flash") and (test("image|tts|embedding|live|native-audio") | not)))
     | sort | .[0] // empty')}"
 
 if [ -z "$MODEL" ]; then
-    fail "could not pick a default model; set OPENAI_MODEL and re-run"
+    fail "could not pick a default model; set AI_MODEL and re-run"
     exit 1
 fi
 
@@ -110,7 +110,7 @@ fi
 
 printf '\n'
 if [ "$failures" -eq 0 ]; then
-    printf 'AI provider is usable. Set OPENAI_MODEL=%s in .env.\n\n' "$MODEL"
+    printf 'AI provider is usable. Set AI_MODEL=%s in .env.\n\n' "$MODEL"
 else
     printf '%d check(s) failed.\n\n' "$failures"
     exit 1
