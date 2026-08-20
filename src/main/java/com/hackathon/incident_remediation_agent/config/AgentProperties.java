@@ -2,6 +2,7 @@ package com.hackathon.incident_remediation_agent.config;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -25,7 +26,16 @@ public record AgentProperties(
 
     public record Deployment(String version, String commitSha, String commitUrl, Instant deployedAt) {}
 
-    public record Ai(String baseUrl, String apiKey, String model) {}
+    /**
+     * @param defaultModels ordered fallback chain used when a task has no explicit entry
+     * @param models        task key (for example {@code fix-proposal}) to its ordered chain
+     */
+    public record Ai(
+        String baseUrl,
+        String apiKey,
+        List<String> defaultModels,
+        Map<String, List<String>> models
+    ) {}
 
     public record GitHub(
         String apiBaseUrl,
