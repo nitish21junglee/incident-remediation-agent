@@ -15,4 +15,14 @@ public record IncidentRun(
     static IncidentRun received(IncidentAlert alert) {
         return new IncidentRun(alert, WorkflowStage.RECEIVED, null, null, null, null, "accepted");
     }
+
+    public IncidentRun jiraCreated(String jiraKey) {
+        return new IncidentRun(this.alert, WorkflowStage.JIRA_CREATED, jiraKey,
+            this.jiraContextCommentId, this.evidenceVersion, this.draftPrUrl, "jira ticket created");
+    }
+
+    public IncidentRun failed(String message) {
+        return new IncidentRun(this.alert, WorkflowStage.FAILED, this.jiraKey,
+            this.jiraContextCommentId, this.evidenceVersion, this.draftPrUrl, message);
+    }
 }
