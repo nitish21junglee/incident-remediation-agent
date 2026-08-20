@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
+import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
 
 /**
  * Decides whether an incident is eligible for AI investigation and, if so, returns the proposal.
@@ -28,12 +29,13 @@ public class AiRouter {
 
     private final AiFixClient aiFixClient;
     private final RepositoryContextReader contextReader;
-    private final AgentProperties properties;
+    private final RepositoryResolver repositories;
 
-    AiRouter(AiFixClient aiFixClient, RepositoryContextReader contextReader, AgentProperties properties) {
+    AiRouter(AiFixClient aiFixClient, RepositoryContextReader contextReader,
+             RepositoryResolver repositories) {
         this.aiFixClient = aiFixClient;
         this.contextReader = contextReader;
-        this.properties = properties;
+        this.repositories = repositories;
     }
 
     public Optional<FixProposal> route(EvidencePack pack) {
@@ -43,9 +45,9 @@ public class AiRouter {
             return Optional.empty();
         }
 
-        AgentProperties.GitHub github = this.properties.github();
+        AgentProperties.RepositoryTarget target = this.repositories.resolve(pack.alert()).orElseThrow();
         Map<String, String> repositoryFiles = this.contextReader.read(
-            Path.of(github.localRepositoryPath()), github.contextFiles());
+            Path.of(target.directory()), target.contextFiles());
 
         FixProposal proposal = this.aiFixClient.propose(pack, repositoryFiles);
         if (proposal == null || !proposal.probableFix()) {
@@ -76,12 +78,9 @@ public class AiRouter {
             return "no top error in the logs";
         }
 
-        AgentProperties.GitHub github = this.properties.github();
-        if (github == null || isBlank(github.repository()) || isBlank(github.localRepositoryPath())) {
-            return "no repository configured";
-        }
-        if (github.contextFiles() == null || github.contextFiles().isEmpty()) {
-            return "no context files configured";
+        // Deterministic lookup on the service id; never inferred from incident or log text.
+        if (this.repositories.resolve(pack.alert()).isEmpty()) {
+            return "no repository mapped for service " + pack.alert().serviceId();
         }
         return null;
     }

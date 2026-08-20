@@ -26,6 +26,7 @@ import com.hackathon.incident_remediation_agent.evidence.DeploymentEvidence;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
 import com.hackathon.incident_remediation_agent.evidence.LogEvidence;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
+import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 
@@ -48,7 +49,7 @@ class AiRouterTest {
         Files.createDirectories(repository.resolve("src/main/java"));
         Files.writeString(repository.resolve(CONTEXT_FILE), "class Mapper {}");
         this.aiFixClient = mock(AiFixClient.class);
-        this.router = router("acme/demo-api");
+        this.router = routerMapping("PDEMO");
     }
 
     @Test
@@ -92,9 +93,10 @@ class AiRouterTest {
         verifyNoAiCall();
     }
 
+    /** An unmapped service must not fall back to some other repository. */
     @Test
-    void skipsWhenRepositoryIsNotConfigured() {
-        assertThat(router("").route(pack("application_error"))).isEmpty();
+    void skipsWhenNoRepositoryIsMappedForTheService() {
+        assertThat(routerMapping("PSOMETHINGELSE").route(pack("application_error"))).isEmpty();
         verifyNoAiCall();
     }
 
@@ -127,16 +129,18 @@ class AiRouterTest {
         verify(aiFixClient, never()).propose(any(), anyMap());
     }
 
-    private AiRouter router(String repositorySlug) {
-        return new AiRouter(aiFixClient, new RepositoryContextReader(), properties(repositorySlug));
-    }
-
-    private AgentProperties properties(String repositorySlug) {
-        return new AgentProperties("fixture", "PDEMO", null, null, null, null, null,
-            new AgentProperties.GitHub(
-                "https://api.github.com", "token", repositorySlug, "main",
-                repository.toString(), "hackathon/incident",
-                List.of(CONTEXT_FILE), List.of(".github/workflows/"), List.of("true")));
+    /** @param mappedServiceId the only service the resolver knows about */
+    private AiRouter routerMapping(String mappedServiceId) {
+        AgentProperties properties = new AgentProperties(
+            "fixture", "PDEMO", null, null, null, null, null,
+            new AgentProperties.GitHub("https://api.github.com", "token",
+                "hackathon/incident", List.of(".github/workflows/"),
+                Map.of("demo-api", new AgentProperties.RepositoryTarget(
+                    "acme/demo-api", "main", repository.toString(),
+                    List.of(CONTEXT_FILE), List.of("true"))),
+                Map.of(mappedServiceId, "demo-api")));
+        return new AiRouter(aiFixClient, new RepositoryContextReader(),
+            new RepositoryResolver(properties));
     }
 
     private EvidencePack pack(String classification) {

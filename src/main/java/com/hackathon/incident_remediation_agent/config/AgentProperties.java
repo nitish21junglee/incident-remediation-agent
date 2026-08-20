@@ -37,15 +37,30 @@ public record AgentProperties(
         Map<String, List<String>> models
     ) {}
 
+    /**
+     * @param repositories       short repository name to where it lives and how to validate it.
+     *                           This doubles as an allowlist: only names here can ever be cloned,
+     *                           patched or pushed.
+     * @param serviceRepositories PagerDuty service id to the short repository name that owns it
+     */
     public record GitHub(
         String apiBaseUrl,
         String token,
-        String repository,
-        String baseBranch,
-        String localRepositoryPath,
         String branchPrefix,
-        List<String> contextFiles,
         List<String> protectedPaths,
+        Map<String, RepositoryTarget> repositories,
+        Map<String, String> serviceRepositories
+    ) {}
+
+    /**
+     * @param slug      the {@code owner/name} used against the GitHub API
+     * @param directory local checkout the workspace clones from
+     */
+    public record RepositoryTarget(
+        String slug,
+        String baseBranch,
+        String directory,
+        List<String> contextFiles,
         List<String> validationCommand
     ) {}
 }
