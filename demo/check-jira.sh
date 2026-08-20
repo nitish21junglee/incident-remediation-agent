@@ -91,10 +91,19 @@ else
         else
             # The plan's create body sends only these five fields.
             sent='["project","issuetype","summary","description","labels"]'
+            # Jira supplies its own value for required fields carrying hasDefaultValue
+            # (reporter is the usual one), so those need not appear in the create body.
             missing=$(body "$fields" | jq -r --argjson sent "$sent" '
-                [.fields[] | select(.required == true) | .fieldId]
+                [.fields[] | select(.required == true and .hasDefaultValue != true) | .fieldId]
                 | map(select(. as $f | $sent | index($f) | not))
                 | .[]')
+
+            defaulted=$(body "$fields" | jq -r '
+                [.fields[] | select(.required == true and .hasDefaultValue == true) | .name]
+                | join(", ")')
+            if [ -n "$defaulted" ]; then
+                pass "required but auto-filled by Jira: $defaulted"
+            fi
 
             if [ -z "$missing" ]; then
                 pass "no required fields beyond those the agent already sends"
