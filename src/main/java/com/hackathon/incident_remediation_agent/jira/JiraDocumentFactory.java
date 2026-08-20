@@ -38,7 +38,7 @@ public class JiraDocumentFactory {
         ArrayNode facts = bulletList(blocks);
         fact(facts, "Incident", alert.incidentId());
         fact(facts, "Title", alert.title());
-        fact(facts, "Service", alert.serviceId());
+        fact(facts, "Service", "%s (%s)".formatted(alert.serviceName(), alert.serviceId()));
         fact(facts, "Triggered", alert.triggeredAt().toString());
         fact(facts, "Event", alert.eventId());
 

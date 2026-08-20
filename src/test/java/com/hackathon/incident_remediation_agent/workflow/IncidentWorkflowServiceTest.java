@@ -30,6 +30,7 @@ class IncidentWorkflowServiceTest {
         "PINCIDENT",
         "demo-api error rate increased",
         "PDEMO",
+        "demo-api",
         Instant.parse("2026-08-14T02:14:00Z"),
         URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
 

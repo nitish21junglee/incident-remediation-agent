@@ -102,7 +102,7 @@ class RepositoryResolverTest {
 
     private static IncidentAlert alert(String serviceId) {
         return new IncidentAlert("01JDEMOEVENT", "PINCIDENT", "demo-api error rate increased",
-            serviceId, Instant.parse("2026-08-14T02:14:00Z"),
+            serviceId, "demo-api", Instant.parse("2026-08-14T02:14:00Z"),
             URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
     }
 }

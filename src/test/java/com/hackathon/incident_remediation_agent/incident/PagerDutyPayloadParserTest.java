@@ -27,6 +27,7 @@ class PagerDutyPayloadParserTest {
         assertThat(alert.incidentId()).isEqualTo("PINCIDENT");
         assertThat(alert.title()).isEqualTo("demo-api error rate increased");
         assertThat(alert.serviceId()).isEqualTo("PDEMO");
+        assertThat(alert.serviceName()).isEqualTo("demo-api");
         assertThat(alert.triggeredAt()).isEqualTo(Instant.parse("2026-08-14T02:14:00Z"));
         assertThat(alert.incidentUrl())
             .isEqualTo(URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
@@ -50,6 +51,15 @@ class PagerDutyPayloadParserTest {
         assertThatIllegalArgumentException()
             .isThrownBy(() -> parser.parse(payload))
             .withMessageContaining("/event/data/id");
+    }
+
+    /** The name drives the observability queries, so falling back keeps a sparse payload usable. */
+    @Test
+    void fallsBackToTheServiceIdWhenNoServiceNameIsPresent() {
+        JsonNode payload = fixture();
+        ((ObjectNode) payload.at("/event/data/service")).remove("summary");
+
+        assertThat(parser.parse(payload).serviceName()).isEqualTo("PDEMO");
     }
 
     @Test

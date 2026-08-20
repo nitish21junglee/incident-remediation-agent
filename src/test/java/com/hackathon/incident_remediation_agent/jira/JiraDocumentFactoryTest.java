@@ -23,6 +23,7 @@ class JiraDocumentFactoryTest {
         "PINCIDENT",
         "demo-api error rate increased",
         "PDEMO",
+        "demo-api",
         Instant.parse("2026-08-14T02:14:00Z"),
         URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
 
@@ -44,6 +45,7 @@ class JiraDocumentFactoryTest {
         assertThat(flattenText(document))
             .contains("PINCIDENT")
             .contains("demo-api error rate increased")
+            .contains("demo-api")
             .contains("PDEMO")
             .contains("2026-08-14T02:14:00Z")
             .contains("01JDEMOEVENT");

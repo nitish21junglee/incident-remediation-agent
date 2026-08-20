@@ -183,7 +183,7 @@ class AiRouterTest {
 
     private static IncidentAlert alert() {
         return new IncidentAlert("01JDEMOEVENT", "PINCIDENT", "demo-api error rate increased",
-            "PDEMO", Instant.parse("2026-08-14T02:14:00Z"),
+            "PDEMO", "demo-api", Instant.parse("2026-08-14T02:14:00Z"),
             URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
     }
 
