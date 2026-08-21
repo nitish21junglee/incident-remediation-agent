@@ -20,6 +20,7 @@ public class SlackNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(SlackNotifier.class);
     private static final String SLACK_API = "https://slack.com/api/chat.postMessage";
+    private static final String REACTIONS_API = "https://slack.com/api/reactions.add";
 
     private final RestClient restClient;
     private final String botToken;
@@ -35,6 +36,28 @@ public class SlackNotifier {
 
     public void registerThread(String incidentId, String channelId, String threadTs) {
         this.threads.put(incidentId, new ThreadInfo(channelId, threadTs));
+    }
+
+    public void acknowledgeMessage(String channelId, String ts) {
+        if (botToken.isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> body = Map.of(
+                "channel", channelId,
+                "timestamp", ts,
+                "name", "eyes");
+
+            this.restClient.post()
+                .uri(URI.create(REACTIONS_API))
+                .header("Authorization", "Bearer " + botToken)
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
+        }
+        catch (RuntimeException exception) {
+            log.warn("Failed to acknowledge Slack message: {}", exception.getMessage());
+        }
     }
 
     public void incidentReceived(IncidentAlert alert) {

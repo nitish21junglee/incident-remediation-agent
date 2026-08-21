@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,6 +39,14 @@ public class SlackEventController {
 
     private static final Pattern INCIDENT_TYPE_PATTERN =
         Pattern.compile("Incident type:\\s*(.+)", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Subtypes that re-announce or mutate an existing message rather than deliver new content.
+     * "bot_message" is intentionally NOT here: PagerDuty's Slack integration posts alerts as a
+     * bot, so filtering it out would drop every real incident trigger.
+     */
+    private static final Set<String> IGNORED_SUBTYPES =
+        Set.of("message_changed", "message_deleted", "message_replied");
 
     private final IncidentRunStore store;
     private final IncidentWorkflow workflow;
@@ -74,20 +83,23 @@ public class SlackEventController {
             return ResponseEntity.ok().build();
         }
 
-        if (event.has("subtype")) {
+        if (IGNORED_SUBTYPES.contains(event.path("subtype").asString(""))) {
             return ResponseEntity.ok().build();
         }
 
+        String messageTs = event.path("ts").asString();
+        String channel = event.path("channel").asString();
+        slackNotifier.acknowledgeMessage(channel, messageTs);
+
         Optional<IncidentAlert> alert = extractIncidentFromMessage(event);
         if (alert.isEmpty()) {
+            log.info("Slack message in {} did not match an incident pattern; ts={}", channel, messageTs);
             return ResponseEntity.ok().build();
         }
 
         IncidentAlert incident = alert.get();
         log.info("Incident detected from Slack: {} ({})", incident.incidentId(), incident.title());
 
-        String messageTs = event.path("ts").asString();
-        String channel = event.path("channel").asString();
         slackNotifier.registerThread(incident.incidentId(), channel, messageTs);
 
         Optional<IncidentRun> started = store.start(incident);
