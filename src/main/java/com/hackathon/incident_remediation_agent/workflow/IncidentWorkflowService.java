@@ -13,6 +13,7 @@ import com.hackathon.incident_remediation_agent.ai.RoutedFix;
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.EvidenceCollectionService;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
+import com.hackathon.incident_remediation_agent.git.DraftPullRequest;
 import com.hackathon.incident_remediation_agent.git.FixGate;
 import com.hackathon.incident_remediation_agent.git.FixSubmission;
 import com.hackathon.incident_remediation_agent.git.GitHubClient;
@@ -113,10 +114,19 @@ public class IncidentWorkflowService implements IncidentWorkflow {
 
     private void investigate(IncidentAlert alert, JiraTicket ticket) {
         this.store.update(alert.incidentId(), IncidentRun::collectingContext);
-        EvidencePack pack = this.evidence.collect(alert, ticket);
+        EvidencePack collected = this.evidence.collect(alert, ticket);
+
+        // The rollback is offered before the investigation, not after it: whoever is on call wants
+        // the way back long before they want a diagnosis, and the draft costs nothing until a
+        // human merges it.
+        EvidencePack pack = collected.change() == null
+            ? collected
+            : withRevert(alert, collected);
+
         this.incidentDocuments.update(alert.incidentId(),
             current -> current.signalFxExports(pack.metrics())
-                .lastPullRequest(pack.change() == null ? null : pack.change().lastPullRequest()));
+                .lastPullRequest(pack.change() == null ? null : pack.change().lastPullRequest())
+                .revertPullRequest(pack.change() == null ? null : pack.change().revertPullRequest()));
 
         String commentId = this.jiraClient.addComment(ticket, this.documents.contextComment(pack));
         this.store.update(alert.incidentId(),
@@ -140,6 +150,26 @@ public class IncidentWorkflowService implements IncidentWorkflow {
         }
 
         submit(alert, ticket, commentId, pack, routed.get());
+    }
+
+    /**
+     * Opening the revert must never cost the investigation. A repository that cannot be written
+     * to, or a change with nothing to put back, leaves the pack as it was and the run continues.
+     */
+    private EvidencePack withRevert(IncidentAlert alert, EvidencePack pack) {
+        try {
+            return this.repositories.resolve(alert)
+                .map(target -> this.gitHubClient.revert(pack, pack.change(), target))
+                .map(revert -> new EvidencePack(pack.alert(), pack.ticket(), pack.logs(),
+                    pack.metrics(), pack.deployment(), pack.change().withRevert(revert),
+                    pack.classification(), pack.evidenceVersion()))
+                .orElse(pack);
+        }
+        catch (RuntimeException exception) {
+            log.warn("Could not open a revert pull request for {}; continuing without one",
+                alert.incidentId(), exception);
+            return pack;
+        }
     }
 
     private void submit(IncidentAlert alert, JiraTicket ticket, String commentId, EvidencePack pack,

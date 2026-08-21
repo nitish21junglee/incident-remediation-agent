@@ -64,7 +64,8 @@ public class GitHubChangeCollector {
                 instant(head.path("commit").path("author"), "date"),
                 diff.patches(),
                 diff.dropped(),
-                lastPullRequest(target));
+                lastPullRequest(target),
+                null);
             log.info("Head of {}@{} is {} ({} chars of diff, {} file patches dropped)",
                 target.slug(), target.baseBranch(), abbreviate(change.commitSha()),
                 diff.patches().length(), diff.dropped());

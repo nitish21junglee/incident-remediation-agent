@@ -10,6 +10,7 @@ import com.hackathon.incident_remediation_agent.ai.FixProposal;
 import com.hackathon.incident_remediation_agent.evidence.LogEvidence;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
 import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
+import com.hackathon.incident_remediation_agent.git.DraftPullRequest;
 import com.hackathon.incident_remediation_agent.incident.WorkflowStage;
 
 /**
@@ -34,39 +35,50 @@ public record IncidentDocument(
     LogEvidence splunkLogs,
     MetricEvidence signalFxExports,
     RepositoryChange.PullRequest lastPullRequest,
+    DraftPullRequest revertPullRequest,
     FixProposal aiOutput,
     Instant timestamp,
     WorkflowStage status
 ) {
 
     public static IncidentDocument received(String incidentId) {
-        return new IncidentDocument(incidentId, null, null, null, null, null, null, Instant.now(),
-            WorkflowStage.RECEIVED);
+        return new IncidentDocument(incidentId, null, null, null, null, null, null, null,
+            Instant.now(), WorkflowStage.RECEIVED);
     }
 
     public IncidentDocument jiraCreated(String jiraKey, URI jiraUrl) {
         return new IncidentDocument(this.incidentId, jiraKey, jiraUrl, this.splunkLogs,
-            this.signalFxExports, this.lastPullRequest, this.aiOutput, Instant.now(),
-            WorkflowStage.JIRA_CREATED);
+            this.signalFxExports, this.lastPullRequest, this.revertPullRequest, this.aiOutput,
+            Instant.now(), WorkflowStage.JIRA_CREATED);
     }
 
     public IncidentDocument signalFxExports(MetricEvidence signalFxExports) {
         return new IncidentDocument(this.incidentId, this.jiraKey, this.jiraUrl, this.splunkLogs,
-            signalFxExports, this.lastPullRequest, this.aiOutput, Instant.now(), this.status);
+            signalFxExports, this.lastPullRequest, this.revertPullRequest, this.aiOutput,
+            Instant.now(), this.status);
     }
 
     public IncidentDocument lastPullRequest(RepositoryChange.PullRequest lastPullRequest) {
         return new IncidentDocument(this.incidentId, this.jiraKey, this.jiraUrl, this.splunkLogs,
-            this.signalFxExports, lastPullRequest, this.aiOutput, Instant.now(), this.status);
+            this.signalFxExports, lastPullRequest, this.revertPullRequest, this.aiOutput,
+            Instant.now(), this.status);
+    }
+
+    public IncidentDocument revertPullRequest(DraftPullRequest revertPullRequest) {
+        return new IncidentDocument(this.incidentId, this.jiraKey, this.jiraUrl, this.splunkLogs,
+            this.signalFxExports, this.lastPullRequest, revertPullRequest, this.aiOutput,
+            Instant.now(), this.status);
     }
 
     public IncidentDocument aiOutput(FixProposal aiOutput) {
         return new IncidentDocument(this.incidentId, this.jiraKey, this.jiraUrl, this.splunkLogs,
-            this.signalFxExports, this.lastPullRequest, aiOutput, Instant.now(), this.status);
+            this.signalFxExports, this.lastPullRequest, this.revertPullRequest, aiOutput,
+            Instant.now(), this.status);
     }
 
     public IncidentDocument status(WorkflowStage status) {
         return new IncidentDocument(this.incidentId, this.jiraKey, this.jiraUrl, this.splunkLogs,
-            this.signalFxExports, this.lastPullRequest, this.aiOutput, Instant.now(), status);
+            this.signalFxExports, this.lastPullRequest, this.revertPullRequest, this.aiOutput,
+            Instant.now(), status);
     }
 }
