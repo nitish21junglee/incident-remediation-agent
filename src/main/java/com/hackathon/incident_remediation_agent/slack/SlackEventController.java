@@ -39,6 +39,9 @@ public class SlackEventController {
     private static final Pattern INCIDENT_TYPE_PATTERN =
         Pattern.compile("Incident type:\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
+    private static final Pattern SLACK_LINK_PATTERN =
+        Pattern.compile("<[^|>]+\\|([^>]+)>");
+
     private final IncidentRunStore store;
     private final IncidentWorkflow workflow;
     private final SlackNotifier slackNotifier;
@@ -70,11 +73,20 @@ public class SlackEventController {
             return ResponseEntity.ok().build();
         }
 
-        if (!channelId.isBlank() && !channelId.equals(event.path("channel").asString())) {
+        String eventChannel = event.path("channel").asString();
+        log.debug("Slack message in channel={}, configured channel={}, subtype={}",
+            eventChannel, channelId, event.path("subtype").asString());
+
+        if (!channelId.isBlank() && !channelId.equals(eventChannel)) {
+            log.debug("Channel mismatch — ignoring message");
             return ResponseEntity.ok().build();
         }
 
-        if (event.has("subtype")) {
+        String subtype = event.path("subtype").asString();
+        if (subtype != null
+            && !subtype.isEmpty()
+            && !"bot_message".equals(subtype)) {
+            log.debug("Ignoring message with subtype={}", subtype);
             return ResponseEntity.ok().build();
         }
 
@@ -100,24 +112,37 @@ public class SlackEventController {
 
     private Optional<IncidentAlert> extractIncidentFromMessage(JsonNode event) {
         String text = event.path("text").asString();
+        log.debug("Slack event text field: [{}]", text);
+
         if (text == null || text.isBlank()) {
             text = extractTextFromBlocks(event);
+            log.debug("Text from blocks: [{}]", text);
         }
         if (text == null || text.isBlank()) {
+            text = extractTextFromAttachments(event);
+            log.debug("Text from attachments: [{}]", text);
+        }
+        if (text == null || text.isBlank()) {
+            log.info("Slack message had no extractable text — skipping");
             return Optional.empty();
         }
 
         String cleanText = stripEmoji(text);
+        log.debug("After emoji strip: [{}]", cleanText);
 
         Matcher urlMatcher = INCIDENT_URL_PATTERN.matcher(text);
         if (urlMatcher.find()) {
+            log.info("PagerDuty URL found: {}", urlMatcher.group(0));
             return buildFromUrl(event, text, cleanText, urlMatcher);
         }
 
         if (looksLikePagerDutyAlert(cleanText)) {
+            log.info("Looks like PagerDuty alert text (no URL)");
             return buildFromAlertText(event, cleanText);
         }
 
+        log.info("Message did not match PagerDuty patterns — skipping. Text: [{}]",
+            cleanText.length() > 200 ? cleanText.substring(0, 200) + "..." : cleanText);
         return Optional.empty();
     }
 
@@ -150,8 +175,13 @@ public class SlackEventController {
             }
         }
 
+        String eventId = event.path("client_msg_id").asString();
+        if (eventId == null || eventId.isBlank()) {
+            eventId = ts;
+        }
+
         return new IncidentAlert(
-            event.path("client_msg_id").asString(),
+            eventId,
             incidentId,
             title,
             "",
@@ -168,7 +198,13 @@ public class SlackEventController {
     private String extractServiceFromText(String text) {
         Matcher m = SERVICE_PATTERN.matcher(text);
         if (m.find()) {
-            return m.group(1).strip();
+            String raw = m.group(1).strip();
+            // Slack link format: <url|display text> — extract display text
+            Matcher linkMatcher = SLACK_LINK_PATTERN.matcher(raw);
+            if (linkMatcher.find()) {
+                return linkMatcher.group(1).strip();
+            }
+            return raw;
         }
         return "unknown";
     }
@@ -192,7 +228,14 @@ public class SlackEventController {
     }
 
     private static String stripEmoji(String text) {
-        return text.replaceAll(":[a-z_]+:", "").strip();
+        // Remove Slack-style :emoji_code: patterns (including codes with numbers like :+1:)
+        String cleaned = text.replaceAll(":[a-z0-9_+-]+:", "");
+        // Remove Unicode emoji characters (emoticons, symbols, pictographs, transport, flags, etc.)
+        cleaned = cleaned.replaceAll("[\\x{1F600}-\\x{1F64F}\\x{1F300}-\\x{1F5FF}\\x{1F680}-\\x{1F6FF}" +
+            "\\x{1F1E0}-\\x{1F1FF}\\x{2600}-\\x{27BF}\\x{2300}-\\x{23FF}\\x{2B50}\\x{2B55}" +
+            "\\x{FE0F}\\x{200D}\\x{20E3}\\x{1F900}-\\x{1F9FF}\\x{1FA00}-\\x{1FA6F}" +
+            "\\x{1FA70}-\\x{1FAFF}\\x{2702}-\\x{27B0}\\x{1F004}\\x{1F0CF}]", "");
+        return cleaned.strip();
     }
 
     private String extractTextFromBlocks(JsonNode event) {
@@ -213,7 +256,50 @@ public class SlackEventController {
                     if (!elemText.isMissingNode() && elemText.isTextual()) {
                         sb.append(elemText.asString()).append('\n');
                     }
+                    JsonNode innerElements = elem.path("elements");
+                    if (innerElements.isArray()) {
+                        for (JsonNode inner : innerElements) {
+                            if ("text".equals(inner.path("type").asString())) {
+                                sb.append(inner.path("text").asString()).append(' ');
+                            }
+                            if ("link".equals(inner.path("type").asString())) {
+                                sb.append(inner.path("url").asString()).append(' ');
+                            }
+                        }
+                        sb.append('\n');
+                    }
                 }
+            }
+        }
+        return sb.toString().strip();
+    }
+
+    private String extractTextFromAttachments(JsonNode event) {
+        JsonNode attachments = event.path("attachments");
+        if (!attachments.isArray()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode att : attachments) {
+            String pretext = att.path("pretext").asString();
+            if (pretext != null && !pretext.isBlank()) {
+                sb.append(pretext).append('\n');
+            }
+            String fallback = att.path("fallback").asString();
+            if (fallback != null && !fallback.isBlank()) {
+                sb.append(fallback).append('\n');
+            }
+            String attText = att.path("text").asString();
+            if (attText != null && !attText.isBlank()) {
+                sb.append(attText).append('\n');
+            }
+            String title = att.path("title").asString();
+            if (title != null && !title.isBlank()) {
+                sb.append(title).append('\n');
+            }
+            String titleLink = att.path("title_link").asString();
+            if (titleLink != null && !titleLink.isBlank()) {
+                sb.append(titleLink).append('\n');
             }
         }
         return sb.toString().strip();
