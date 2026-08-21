@@ -48,15 +48,23 @@ public class SlackNotifier {
                 "timestamp", ts,
                 "name", "eyes");
 
-            this.restClient.post()
+            Map<?, ?> response = this.restClient.post()
                 .uri(URI.create(REACTIONS_API))
                 .header("Authorization", "Bearer " + botToken)
                 .body(body)
                 .retrieve()
-                .toBodilessEntity();
+                .body(Map.class);
+
+            logIfSlackError("reactions.add", response);
         }
         catch (RuntimeException exception) {
             log.warn("Failed to acknowledge Slack message: {}", exception.getMessage());
+        }
+    }
+
+    private static void logIfSlackError(String apiMethod, Map<?, ?> response) {
+        if (response != null && Boolean.FALSE.equals(response.get("ok"))) {
+            log.warn("Slack {} rejected the request: {}", apiMethod, response.get("error"));
         }
     }
 
@@ -117,12 +125,14 @@ public class SlackNotifier {
             body.put("thread_ts", threadTs);
             body.put("blocks", blocks);
 
-            this.restClient.post()
+            Map<?, ?> response = this.restClient.post()
                 .uri(URI.create(SLACK_API))
                 .header("Authorization", "Bearer " + botToken)
                 .body(body)
                 .retrieve()
-                .toBodilessEntity();
+                .body(Map.class);
+
+            logIfSlackError("chat.postMessage", response);
         }
         catch (RuntimeException exception) {
             log.warn("Failed to post Slack thread reply: {}", exception.getMessage());
