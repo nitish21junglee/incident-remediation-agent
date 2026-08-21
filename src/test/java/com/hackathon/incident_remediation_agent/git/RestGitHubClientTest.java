@@ -211,9 +211,9 @@ class RestGitHubClientTest {
         return new EvidencePack(alert,
             new JiraTicket("SCRUM-1", URI.create("https://demo.atlassian.net/browse/SCRUM-1")),
             new LogEvidence(184, "NullPointerException", List.of("sample"), null),
-            new MetricEvidence(0.001, 0.4, false, null),
+            new MetricEvidence(0.001, 0.4, false, null, List.of()),
             new DeploymentEvidence("v1.4.2", "abc123", null,
                 Instant.parse("2026-08-14T02:04:00Z")),
-            "application_error", "evidence-sha");
+            null, "application_error", "evidence-sha");
     }
 }

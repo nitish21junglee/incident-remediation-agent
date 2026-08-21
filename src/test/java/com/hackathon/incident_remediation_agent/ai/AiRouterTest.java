@@ -110,7 +110,7 @@ class AiRouterTest {
     @Test
     void skipsWhenJiraKeyIsMissing() {
         EvidencePack pack = new EvidencePack(alert(), null, logs("NullPointerException"),
-            metrics(), deployment(), "application_error", "v1");
+            metrics(), deployment(), null, "application_error", "v1");
 
         assertThat(router.route(pack)).isEmpty();
         verifyNoAiCall();
@@ -119,7 +119,7 @@ class AiRouterTest {
     @Test
     void skipsWhenEvidenceVersionIsMissing() {
         EvidencePack pack = new EvidencePack(alert(), ticket(), logs("NullPointerException"),
-            metrics(), deployment(), "application_error", "  ");
+            metrics(), deployment(), null, "application_error", "  ");
 
         assertThat(router.route(pack)).isEmpty();
         verifyNoAiCall();
@@ -142,7 +142,7 @@ class AiRouterTest {
     @Test
     void skipsWhenTopErrorIsBlank() {
         EvidencePack pack = new EvidencePack(alert(), ticket(), logs("  "),
-            metrics(), deployment(), "application_error", "v1");
+            metrics(), deployment(), null, "application_error", "v1");
 
         assertThat(router.route(pack)).isEmpty();
         verifyNoAiCall();
@@ -171,7 +171,7 @@ class AiRouterTest {
             new LogEvidence(143, "NullPointerException", List.of(
                 "\tat org.springframework.web.servlet.DispatcherServlet.doGet(DispatcherServlet.java:1072)",
                 "\tat java.base/java.lang.Thread.run(Thread.java:1583)"), null),
-            metrics(), deployment(), "application_error", "v1");
+            metrics(), deployment(), null, "application_error", "v1");
 
         assertThat(router.route(pack)).isEmpty();
         verifyNoAiCall();
@@ -218,7 +218,7 @@ class AiRouterTest {
 
     private EvidencePack pack(String classification) {
         return new EvidencePack(alert(), ticket(), logs("NullPointerException in Mapper.java:44"),
-            metrics(), deployment(), classification, "v1");
+            metrics(), deployment(), null, classification, "v1");
     }
 
     private static IncidentAlert alert() {
@@ -237,7 +237,8 @@ class AiRouterTest {
     }
 
     private static MetricEvidence metrics() {
-        return new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard"));
+        return new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard"),
+            List.of());
     }
 
     private static DeploymentEvidence deployment() {

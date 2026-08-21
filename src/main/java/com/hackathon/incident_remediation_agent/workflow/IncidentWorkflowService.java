@@ -108,7 +108,8 @@ public class IncidentWorkflowService implements IncidentWorkflow {
         this.store.update(alert.incidentId(), IncidentRun::collectingContext);
         EvidencePack pack = this.evidence.collect(alert, ticket);
         this.incidentDocuments.update(alert.incidentId(),
-            current -> current.signalFxExports(pack.metrics()));
+            current -> current.signalFxExports(pack.metrics())
+                .lastPullRequest(pack.change() == null ? null : pack.change().lastPullRequest()));
 
         String commentId = this.jiraClient.addComment(ticket, this.documents.contextComment(pack));
         this.store.update(alert.incidentId(),
