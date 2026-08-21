@@ -25,6 +25,12 @@
   --blue-border: #b8d4f2;
   --blue-strong: #1a4d85;
 
+  /* Chart series: steps of the same blue, ordered dark-to-light. Each step is paired in JS with
+     its own dash pattern, so series stay separable for CVD/print readers without a second hue. */
+  --chart-series-1: #2b6cb0;
+  --chart-series-2: #123a68;
+  --chart-series-3: #6fa3d6;
+
   /* Aliases kept so every status/badge/link in the UI resolves to the same blue instead of
      introducing a second hue. */
   --accent: var(--blue);
@@ -556,37 +562,6 @@ body::before {
   animation: pulse 1.8s ease-in-out infinite;
 }
 
-/* ── Error rate bar ── */
-.error-rate-cell {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.error-bar-container {
-  display: flex;
-  gap: 3px;
-  align-items: flex-end;
-  height: 22px;
-}
-
-.error-bar {
-  width: 18px;
-  border-radius: 3px 3px 0 0;
-  min-height: 3px;
-  transition: height 0.5s ease;
-}
-
-.error-bar.before { background: var(--border); }
-.error-bar.during { background: var(--red); }
-
-.error-labels {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-weight: 500;
-  line-height: 1.2;
-}
-
 .latency-indicator {
   font-size: 11px;
   font-weight: 600;
@@ -821,39 +796,130 @@ body::before {
   background: var(--purple-light);
 }
 
-.export-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
+/* ── SignalFx program charts ── */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px 6px;
+  margin-bottom: 12px;
 }
 
-.export-table th {
-  text-align: left;
-  font-size: 10px;
-  font-weight: 600;
+.chart-card:last-child {
+  margin-bottom: 0;
+}
+
+.chart-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chart-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.3px;
+}
+
+.chart-card-meta {
+  font-size: 11px;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-hover);
   white-space: nowrap;
 }
 
-.export-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-light);
-  color: var(--text);
-}
-
-.export-table tr:last-child td {
-  border-bottom: none;
-}
-
-.export-filter {
+.chart-card-filter {
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   font-size: 11px;
   color: var(--text-secondary);
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+.chart-wrap {
+  position: relative;
+  margin-top: 8px;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.chart-grid {
+  stroke: var(--border-light);
+  stroke-width: 1;
+}
+
+.chart-axis-label {
+  font-size: 10px;
+  fill: var(--text-muted);
+}
+
+.chart-area {
+  fill: var(--blue);
+  opacity: 0.08;
+}
+
+.chart-crosshair {
+  stroke: var(--blue-border);
+  stroke-width: 1;
+}
+
+.chart-empty {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 18px 0 12px;
+}
+
+.chart-tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 14px rgba(22, 50, 79, 0.12);
+  padding: 6px 10px;
+  pointer-events: none;
+  z-index: 3;
+  min-width: 96px;
+}
+
+.chart-tooltip-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.chart-tooltip-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+}
+
+.chart-tooltip-label {
+  color: var(--text-secondary);
+}
+
+.chart-tooltip-value {
+  color: var(--text);
+  font-weight: 600;
 }
 
 /* ── Loading / empty ── */
@@ -969,59 +1035,6 @@ body::before {
 @keyframes flashStrong {
   0% { background: rgba(26, 77, 133, 0.28); }
   100% { background: transparent; }
-}
-
-/* ── Screen shake ── */
-.screen-shake {
-  animation: screenShake 0.5s ease-out;
-}
-
-@keyframes screenShake {
-  0%, 100% { transform: translate(0, 0); }
-  10% { transform: translate(-8px, 4px); }
-  20% { transform: translate(6px, -6px); }
-  30% { transform: translate(-4px, 2px); }
-  40% { transform: translate(4px, -3px); }
-  50% { transform: translate(-2px, 4px); }
-  60% { transform: translate(3px, -2px); }
-  70% { transform: translate(-1px, 1px); }
-  80% { transform: translate(1px, -1px); }
-}
-
-/* ── Confetti ── */
-.confetti-piece {
-  position: absolute;
-  top: -20px;
-  width: var(--w);
-  height: var(--h);
-  background: var(--color);
-  border-radius: 2px;
-  animation: confettiFall var(--fall-duration) linear forwards;
-  animation-delay: var(--delay);
-  opacity: 0;
-}
-
-@keyframes confettiFall {
-  0% {
-    opacity: 1;
-    transform: translateX(0) translateY(0) rotate(0deg) scale(1);
-  }
-  25% {
-    opacity: 1;
-    transform: translateX(var(--sway)) translateY(25vh) rotate(calc(var(--spin) * 0.3)) scale(1.1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: translateX(calc(var(--sway) * -0.6)) translateY(50vh) rotate(calc(var(--spin) * 0.6)) scale(1);
-  }
-  75% {
-    opacity: 0.6;
-    transform: translateX(calc(var(--sway) * 0.4)) translateY(75vh) rotate(calc(var(--spin) * 0.85)) scale(0.9);
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(calc(var(--sway) * -0.3)) translateY(110vh) rotate(var(--spin)) scale(0.7);
-  }
 }
 
 /* ── Firework bursts ── */
