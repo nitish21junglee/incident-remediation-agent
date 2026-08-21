@@ -1,0 +1,1084 @@
+POST https://api.eu0.signalfx.com/v2/signalflow/execute?start=1786975672370&stop=1786979272370&resolution=60000&immediate=true
+program: data('http.server.requests_count', filter=filter('service.name', 'league-admin-service')).sum().publish()
+---
+status: 200
+event: control-message
+data: {
+data:                                                                                                         "event" : "STREAM_START",
+data:                                                                                                         "timestampMs" : 1786979273499,
+data:                                                                                                         "traceId" : "8730d781423c6d98e3ea57b1ddb9e288"
+data:                                                                                                       }
+
+event: control-message
+data: {
+data:                                                                                                         "event" : "JOB_START",
+data:                                                                                                         "handle" : "HPvFXU6AIAA",
+data:                                                                                                         "timestampMs" : 1786979273633
+data:                                                                                                       }
+
+event: metadata
+data: {
+data:                                                                                                         "properties" : {
+data:                                                                                                           "computationId" : "HPvFXU6AIAA",
+data:                                                                                                           "service.name" : "league-admin-service",
+data:                                                                                                           "sf_isPreQuantized" : true,
+data:                                                                                                           "sf_key" : [ "sf_originatingMetric", "sf_metric", "computationId" ],
+data:                                                                                                           "sf_metric" : "_SF_COMP_HPvFXU6AIAA_02-PUBLISH_METRIC",
+data:                                                                                                           "sf_organizationID" : "GTbUys4AAAI",
+data:                                                                                                           "sf_originatingMetric" : "http.server.requests_count",
+data:                                                                                                           "sf_resolutionMs" : 60000,
+data:                                                                                                           "sf_singletonFixedDimensions" : [ "service.name", "sf_metric" ],
+data:                                                                                                           "sf_type" : "MetricTimeSeries"
+data:                                                                                                         },
+data:                                                                                                         "tsId" : "AAAAAGOWIfE"
+data:                                                                                                       }
+
+event: data
+id: data-1786975620000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 36
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "resolutionMs" : 60000
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_RUNNING_RESOLUTION",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "lagMs" : 12000
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_DETECTED_LAG",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000,
+data:                                                                                                           "tsIds" : [ "HP7bt6RAEAo" ]
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "deadlineType" : "AUTOMATIC",
+data:                                                                                                             "maxDelayMs" : 14400
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_INITIAL_MAX_DELAY",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "messageCode" : "FETCH_NUM_TIMESERIES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "maxExtrapolations" : -1,
+data:                                                                                                             "numInactiveMembers" : 6
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FETCH_INACTIVE_EMITTERS",
+data:                                                                                                           "messageLevel" : "WARNING",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 97,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 2 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "accumlatingWindow" : null,
+data:                                                                                                             "publishBlock" : {
+data:                                                                                                               "blockPosition" : 0,
+data:                                                                                                               "blockSerialName" : "02-PUBLISH",
+data:                                                                                                               "blockSerialNumber" : 2,
+data:                                                                                                               "blockSourceContext" : {
+data:                                                                                                                 "column" : 97,
+data:                                                                                                                 "line" : 1,
+data:                                                                                                                 "setColumn" : true,
+data:                                                                                                                 "setLine" : true
+data:                                                                                                               }
+data:                                                                                                             },
+data:                                                                                                             "sourceDataBlocks" : [ {
+data:                                                                                                               "blockPosition" : 0,
+data:                                                                                                               "blockSerialName" : "00-DATA",
+data:                                                                                                               "blockSerialNumber" : 0,
+data:                                                                                                               "blockSourceContext" : {
+data:                                                                                                                 "column" : 1,
+data:                                                                                                                 "line" : 1,
+data:                                                                                                                 "setColumn" : true,
+data:                                                                                                                 "setLine" : true
+data:                                                                                                               }
+data:                                                                                                             } ]
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "PUBLISH_SOURCES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : -1,
+data:                                                                                                           "timestampMs" : 1786979273628
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "dimensionCounts" : [ {
+data:                                                                                                               "count" : 98,
+data:                                                                                                               "dimensions" : [ "exception", "k8s.namespace.name", "method", "service.name", "k8s.cluster.name", "os.type", "error", "uri", "cloud.availability_zone", "telemetry.sdk.name", "telemetry.sdk.language", "global.technical_service", "k8s.node.name", "application", "k8s.pod.name", "sf_metric", "host.name", "telemetry.sdk.version", "outcome", "status" ]
+data:                                                                                                             } ]
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FIND_MATCHED_DIMENSIONS",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 97,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 2 ],
+data:                                                                                                           "messageCode" : "ID_NUM_TIMESERIES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 1,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786975620000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "rollupCounts" : [ {
+data:                                                                                                               "count" : 98,
+data:                                                                                                               "rollupType" : "delta"
+data:                                                                                                             } ]
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FETCH_NUM_ROLLUPS",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: data
+id: data-1786975680000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975680000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786975740000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975740000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786975800000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975800000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786975860000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975860000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786975920000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975920000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786975980000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786975980000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976040000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976040000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976100000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976100000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976160000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976160000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976220000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976220000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976280000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976280000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976340000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976340000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976400000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976400000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976460000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976460000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976520000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 31
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976520000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976580000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976580000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976640000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976640000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976700000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976700000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976760000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976760000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976820000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976820000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976880000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 47
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976880000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786976940000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 40
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786976940000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977000000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 38
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977000000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977060000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 41
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977060000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786977060000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "aperiodicity" : false,
+data:                                                                                                             "nativeness" : false
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FETCH_NATIVE_RESOLUTION",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975560000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: data
+id: data-1786977120000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 37
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977120000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977180000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977180000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977240000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977240000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977300000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977300000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977360000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977360000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977420000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977420000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977480000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977480000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977540000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 33
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977540000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977600000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 41
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977600000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977660000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 42
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977660000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977720000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977720000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977780000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977780000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977840000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977840000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977900000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977900000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786977960000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786977960000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978020000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 34
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978020000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978080000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978080000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978140000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978140000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978200000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978200000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978260000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 36
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978260000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978320000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978320000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978380000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 37
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978380000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978440000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978440000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978500000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978500000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978560000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 35
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978560000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978620000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978620000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978680000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978680000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978740000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978740000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978800000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978800000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978860000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978860000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978920000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978920000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786978980000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786978980000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786979040000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786979040000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786979100000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 36
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786979100000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786979160000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786979160000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: data
+id: data-1786979220000
+data: {
+data:                                                                                                         "data" : [ {
+data:                                                                                                           "tsId" : "AAAAAGOWIfE",
+data:                                                                                                           "value" : 32
+data:                                                                                                         } ],
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "maxDelayMs" : 14400
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "resolutionMs" : 60000
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_RUNNING_RESOLUTION",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "lagMs" : 12000
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_DETECTED_LAG",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000,
+data:                                                                                                           "tsIds" : [ "HP7bt6RAEAo" ]
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ ],
+data:                                                                                                           "blockSerialNumbers" : [ ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "deadlineType" : "AUTOMATIC",
+data:                                                                                                             "maxDelayMs" : 14400
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "JOB_INITIAL_MAX_DELAY",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 0,
+data:                                                                                                           "timestampMs" : 1786975671000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "messageCode" : "FETCH_NUM_TIMESERIES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "maxExtrapolations" : -1,
+data:                                                                                                             "numInactiveMembers" : 6
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FETCH_INACTIVE_EMITTERS",
+data:                                                                                                           "messageLevel" : "WARNING",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 97,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 2 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "accumlatingWindow" : null,
+data:                                                                                                             "publishBlock" : {
+data:                                                                                                               "blockPosition" : 0,
+data:                                                                                                               "blockSerialName" : "02-PUBLISH",
+data:                                                                                                               "blockSerialNumber" : 2,
+data:                                                                                                               "blockSourceContext" : {
+data:                                                                                                                 "column" : 97,
+data:                                                                                                                 "line" : 1,
+data:                                                                                                                 "setColumn" : true,
+data:                                                                                                                 "setLine" : true
+data:                                                                                                               }
+data:                                                                                                             },
+data:                                                                                                             "sourceDataBlocks" : [ {
+data:                                                                                                               "blockPosition" : 0,
+data:                                                                                                               "blockSerialName" : "00-DATA",
+data:                                                                                                               "blockSerialNumber" : 0,
+data:                                                                                                               "blockSourceContext" : {
+data:                                                                                                                 "column" : 1,
+data:                                                                                                                 "line" : 1,
+data:                                                                                                                 "setColumn" : true,
+data:                                                                                                                 "setLine" : true
+data:                                                                                                               }
+data:                                                                                                             } ]
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "PUBLISH_SOURCES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : -1,
+data:                                                                                                           "timestampMs" : 1786979273628
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 1,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 0 ],
+data:                                                                                                           "contents" : {
+data:                                                                                                             "dimensionCounts" : [ {
+data:                                                                                                               "count" : 98,
+data:                                                                                                               "dimensions" : [ "exception", "k8s.namespace.name", "method", "service.name", "k8s.cluster.name", "os.type", "error", "uri", "cloud.availability_zone", "telemetry.sdk.name", "telemetry.sdk.language", "global.technical_service", "k8s.node.name", "application", "k8s.pod.name", "sf_metric", "host.name", "telemetry.sdk.version", "outcome", "status" ]
+data:                                                                                                             } ]
+data:                                                                                                           },
+data:                                                                                                           "messageCode" : "FIND_MATCHED_DIMENSIONS",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 98,
+data:                                                                                                           "timestampMs" : 1786975620000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: message
+data: {
+data:                                                                                                         "logicalTimestampMs" : 1786979220000,
+data:                                                                                                         "message" : {
+data:                                                                                                           "blockContexts" : [ {
+data:                                                                                                             "column" : 97,
+data:                                                                                                             "line" : 1
+data:                                                                                                           } ],
+data:                                                                                                           "blockSerialNumbers" : [ 2 ],
+data:                                                                                                           "messageCode" : "ID_NUM_TIMESERIES",
+data:                                                                                                           "messageLevel" : "INFO",
+data:                                                                                                           "numInputTimeSeries" : 1,
+data:                                                                                                           "timestampMs" : 1786979220000
+data:                                                                                                         }
+data:                                                                                                       }
+
+event: control-message
+data: {
+data:                                                                                                         "event" : "END_OF_CHANNEL",
+data:                                                                                                         "timestampMs" : 1786979273876
+data:                                                                                                       }
+
