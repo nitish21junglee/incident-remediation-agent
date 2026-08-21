@@ -166,7 +166,7 @@ class AiRouterTest {
     /** @param mappedServiceId the only service the resolver knows about */
     private AiRouter routerMapping(String mappedServiceId) {
         AgentProperties properties = new AgentProperties(
-            "fixture", "PDEMO", null, null, null, null, null,
+            "fixture", "PDEMO", null, null, null, null, null, null,
             new AgentProperties.GitHub("https://api.github.com", "token",
                 "agent/incident", false, 5, List.of(".github/workflows/"),
                 Map.of("demo-api", new AgentProperties.RepositoryTarget(

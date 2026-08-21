@@ -100,7 +100,7 @@ class FixGateTest {
 
     private static FixGate gate(int maxChangedFiles, List<String> protectedPaths) {
         return new FixGate(new AgentProperties(
-            "fixture", "P2UX5VH", null, null, null, null, null,
+            "fixture", "P2UX5VH", null, null, null, null, null, null,
             new AgentProperties.GitHub("https://api.github.com", "token", "agent/incident",
                 false, maxChangedFiles, protectedPaths, Map.of(), Map.of())));
     }

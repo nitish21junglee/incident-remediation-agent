@@ -37,7 +37,7 @@ class GitHubContextReaderTest {
         RestClient.Builder builder = RestClient.builder();
         this.server = MockRestServiceServer.bindTo(builder).build();
         this.reader = new GitHubContextReader(builder, new AgentProperties(
-            "fixture", "P2UX5VH", null, null, null, null, null,
+            "fixture", "P2UX5VH", null, null, null, null, null, null,
             new AgentProperties.GitHub(BASE, "token", "agent/incident", false, 5,
                 List.of(), Map.of(), Map.of())));
     }

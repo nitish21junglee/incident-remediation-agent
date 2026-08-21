@@ -6,6 +6,7 @@ import java.io.UncheckedIOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
@@ -14,17 +15,16 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Stand-in until the real Splunk search adapter exists. Serves whatever is in
- * {@code /fixtures/log-evidence.json}.
+ * Fixture-mode log source. Serves whatever is in {@code /fixtures/log-evidence.json}; live mode
+ * uses {@link HttpSplunkCollector} instead.
  *
  * <p>The content is a fixture rather than generated text on purpose: log samples are the only thing
  * telling the model <em>where</em> to look, and they end up quoted in a Jira comment and a pull
  * request body. Invented-looking stack traces there would read as real evidence. Edit the fixture
  * with the actual stack trace from the incident you are demonstrating.
- *
- * <p>When the live collector lands, gate both on {@code agent.mode} the way the AI adapters are.
  */
 @Component
+@ConditionalOnProperty(name = "agent.mode", havingValue = "fixture", matchIfMissing = true)
 public class FixtureSplunkCollector implements SplunkCollector {
 
     private static final Logger log = LoggerFactory.getLogger(FixtureSplunkCollector.class);

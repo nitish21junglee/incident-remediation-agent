@@ -114,7 +114,7 @@ class AiModelSelectorTest {
 
     private static AiModelSelector selector(List<String> defaults, Map<String, List<String>> models) {
         return new AiModelSelector(new AgentProperties(
-            "fixture", "PDEMO", null, null, null, null,
+            "fixture", "PDEMO", null, null, null, null, null,
             new AgentProperties.Ai("https://ai.example", "key", defaults, models),
             null));
     }

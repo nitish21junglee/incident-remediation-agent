@@ -30,7 +30,7 @@ class AiModelAdminControllerTest {
 
         @Bean
         AgentProperties agentProperties() {
-            return new AgentProperties("fixture", "PDEMO", null, null, null, null,
+            return new AgentProperties("fixture", "PDEMO", null, null, null, null, null,
                 new AgentProperties.Ai("https://ai.example", "key",
                     List.of("flash"), Map.of("fix-proposal", List.of("pro"))),
                 null);

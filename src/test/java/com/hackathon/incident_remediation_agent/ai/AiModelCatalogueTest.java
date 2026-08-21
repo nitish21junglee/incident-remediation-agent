@@ -30,7 +30,7 @@ class AiModelCatalogueTest {
         RestClient.Builder builder = RestClient.builder();
         this.server = MockRestServiceServer.bindTo(builder).build();
         this.catalogue = new AiModelCatalogue(builder, new AgentProperties(
-            "fixture", "PDEMO", null, null, null, null,
+            "fixture", "PDEMO", null, null, null, null, null,
             new AgentProperties.Ai(BASE, "secret-key", List.of("gemini-2.5-flash"), Map.of()),
             null));
     }
