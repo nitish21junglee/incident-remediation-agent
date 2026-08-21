@@ -19,7 +19,7 @@ public record AgentProperties(
     GitHub github
 ) {
 
-    public record Slack(String botToken, String signingSecret, String channelId) {}
+    public record Slack(String botToken, String signingSecret, String channelId, String webhookUrl) {}
 
     public record Jira(String baseUrl, String email, String apiToken, String projectKey, String issueType) {}
 

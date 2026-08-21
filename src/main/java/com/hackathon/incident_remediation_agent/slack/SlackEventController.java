@@ -28,16 +28,29 @@ public class SlackEventController {
     private static final Logger log = LoggerFactory.getLogger(SlackEventController.class);
 
     private static final Pattern INCIDENT_URL_PATTERN =
-        Pattern.compile("https?://[^/]+\\.pagerduty\\.com/incidents/(\\w+)");
+        Pattern.compile("https?://[^/|>]+\\.pagerduty\\.com/incidents/(\\w+)");
+
+    private static final Pattern SERVICE_PATTERN =
+        Pattern.compile("Service:\\s*(.+)", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern URGENCY_PATTERN =
+        Pattern.compile("Urgency:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
+
+    private static final Pattern INCIDENT_TYPE_PATTERN =
+        Pattern.compile("Incident type:\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
     private final IncidentRunStore store;
     private final IncidentWorkflow workflow;
+    private final SlackNotifier slackNotifier;
     private final String channelId;
 
-    SlackEventController(IncidentRunStore store, IncidentWorkflow workflow, AgentProperties properties) {
+    SlackEventController(IncidentRunStore store, IncidentWorkflow workflow,
+        SlackNotifier slackNotifier, AgentProperties properties) {
         this.store = store;
         this.workflow = workflow;
-        this.channelId = properties.slack() != null ? properties.slack().channelId() : "";
+        this.slackNotifier = slackNotifier;
+        this.channelId = properties.slack() != null && properties.slack().channelId() != null
+            ? properties.slack().channelId() : "";
     }
 
     @PostMapping("/slack/events")
@@ -58,7 +71,6 @@ public class SlackEventController {
         }
 
         if (!channelId.isBlank() && !channelId.equals(event.path("channel").asString())) {
-            log.debug("Ignoring Slack message from channel {}", event.path("channel").asString());
             return ResponseEntity.ok().build();
         }
 
@@ -68,12 +80,15 @@ public class SlackEventController {
 
         Optional<IncidentAlert> alert = extractIncidentFromMessage(event);
         if (alert.isEmpty()) {
-            log.debug("Slack message does not contain a PagerDuty incident link");
             return ResponseEntity.ok().build();
         }
 
         IncidentAlert incident = alert.get();
-        log.info("PagerDuty incident detected from Slack: {} ({})", incident.incidentId(), incident.title());
+        log.info("Incident detected from Slack: {} ({})", incident.incidentId(), incident.title());
+
+        String messageTs = event.path("ts").asString();
+        String channel = event.path("channel").asString();
+        slackNotifier.registerThread(incident.incidentId(), channel, messageTs);
 
         Optional<IncidentRun> started = store.start(incident);
         started.ifPresent(workflow::start);
@@ -92,15 +107,37 @@ public class SlackEventController {
             return Optional.empty();
         }
 
+        String cleanText = stripEmoji(text);
+
         Matcher urlMatcher = INCIDENT_URL_PATTERN.matcher(text);
-        if (!urlMatcher.find()) {
-            return Optional.empty();
+        if (urlMatcher.find()) {
+            return buildFromUrl(event, text, cleanText, urlMatcher);
         }
 
+        if (looksLikePagerDutyAlert(cleanText)) {
+            return buildFromAlertText(event, cleanText);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<IncidentAlert> buildFromUrl(JsonNode event, String text, String cleanText,
+        Matcher urlMatcher) {
         String incidentId = urlMatcher.group(1);
         String incidentUrl = urlMatcher.group(0);
-        String title = extractTitle(text, event);
-        String serviceName = extractServiceName(event);
+        return Optional.of(buildAlert(event, incidentId, extractTitle(text, event),
+            extractServiceFromText(cleanText), URI.create(incidentUrl)));
+    }
+
+    private Optional<IncidentAlert> buildFromAlertText(JsonNode event, String cleanText) {
+        String title = cleanText.lines().findFirst().orElse(cleanText).strip();
+        String serviceName = extractServiceFromText(cleanText);
+        String incidentId = "SLACK-" + event.path("ts").asString().replace(".", "");
+        return Optional.of(buildAlert(event, incidentId, title, serviceName, URI.create("")));
+    }
+
+    private IncidentAlert buildAlert(JsonNode event, String incidentId, String title,
+        String serviceName, URI incidentUrl) {
 
         Instant triggeredAt = Instant.now();
         String ts = event.path("ts").asString();
@@ -113,33 +150,27 @@ public class SlackEventController {
             }
         }
 
-        return Optional.of(new IncidentAlert(
+        return new IncidentAlert(
             event.path("client_msg_id").asString(),
             incidentId,
             title,
             "",
             serviceName,
             triggeredAt,
-            URI.create(incidentUrl)));
+            incidentUrl);
     }
 
-    private String extractServiceName(JsonNode event) {
-        JsonNode attachments = event.path("attachments");
-        if (!attachments.isArray()) {
-            return "";
+    private boolean looksLikePagerDutyAlert(String text) {
+        return INCIDENT_TYPE_PATTERN.matcher(text).find()
+            || (URGENCY_PATTERN.matcher(text).find() && SERVICE_PATTERN.matcher(text).find());
+    }
+
+    private String extractServiceFromText(String text) {
+        Matcher m = SERVICE_PATTERN.matcher(text);
+        if (m.find()) {
+            return m.group(1).strip();
         }
-        for (JsonNode attachment : attachments) {
-            JsonNode fields = attachment.path("fields");
-            if (!fields.isArray()) {
-                continue;
-            }
-            for (JsonNode field : fields) {
-                if ("Service".equalsIgnoreCase(field.path("title").asString().trim())) {
-                    return field.path("value").asString().trim();
-                }
-            }
-        }
-        return "";
+        return "unknown";
     }
 
     private String extractTitle(String text, JsonNode event) {
@@ -156,9 +187,12 @@ public class SlackEventController {
                 }
             }
         }
-
         String firstLine = text.lines().findFirst().orElse(text);
         return firstLine.length() > 200 ? firstLine.substring(0, 200) : firstLine;
+    }
+
+    private static String stripEmoji(String text) {
+        return text.replaceAll(":[a-z_]+:", "").strip();
     }
 
     private String extractTextFromBlocks(JsonNode event) {

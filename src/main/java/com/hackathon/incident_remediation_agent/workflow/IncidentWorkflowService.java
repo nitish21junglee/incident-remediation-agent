@@ -26,6 +26,7 @@ import com.hackathon.incident_remediation_agent.jira.JiraClient;
 import com.hackathon.incident_remediation_agent.jira.JiraDocumentFactory;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 import com.hackathon.incident_remediation_agent.persistence.IncidentDocumentStore;
+import com.hackathon.incident_remediation_agent.slack.SlackNotifier;
 
 /**
  * Runs the incident investigation off the webhook thread.
@@ -51,11 +52,12 @@ public class IncidentWorkflowService implements IncidentWorkflow {
     private final GitHubClient gitHubClient;
     private final IncidentRunStore store;
     private final IncidentDocumentStore incidentDocuments;
+    private final SlackNotifier slack;
 
     IncidentWorkflowService(JiraClient jiraClient, JiraDocumentFactory documents,
         EvidenceCollectionService evidence, AiRouter aiRouter, RepositoryResolver repositories,
         FixGate gate, GitHubClient gitHubClient, IncidentRunStore store,
-        IncidentDocumentStore incidentDocuments) {
+        IncidentDocumentStore incidentDocuments, SlackNotifier slack) {
         this.jiraClient = jiraClient;
         this.documents = documents;
         this.evidence = evidence;
@@ -65,6 +67,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
         this.gitHubClient = gitHubClient;
         this.store = store;
         this.incidentDocuments = incidentDocuments;
+        this.slack = slack;
     }
 
     @Override
@@ -72,6 +75,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
     public void start(IncidentRun run) {
         IncidentAlert alert = run.alert();
         this.incidentDocuments.start(alert.incidentId());
+        this.slack.incidentReceived(alert);
 
         JiraTicket ticket;
         try {
@@ -81,6 +85,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 current -> current.jiraCreated(ticket.key(), ticket.browseUrl()));
             log.info("Created Jira ticket {} ({}) for incident {}",
                 ticket.key(), ticket.browseUrl(), alert.incidentId());
+            this.slack.jiraCreated(alert, ticket.key(), ticket.browseUrl());
         }
         catch (RuntimeException exception) {
             log.error("Jira ticket creation failed for incident {}; abandoning run",
@@ -89,6 +94,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 current -> current.failed("jira ticket creation failed: " + exception.getMessage()));
             this.incidentDocuments.update(alert.incidentId(),
                 current -> current.status(WorkflowStage.FAILED));
+            this.slack.workflowFailed(alert, "Jira ticket creation failed");
             return;
         }
 
@@ -101,6 +107,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 current -> current.failed("investigation failed: " + exception.getMessage()));
             this.incidentDocuments.update(alert.incidentId(),
                 current -> current.status(WorkflowStage.FAILED));
+            this.slack.workflowFailed(alert, exception.getMessage());
         }
     }
 
@@ -115,6 +122,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             current -> current.contextPublished(commentId, pack.evidenceVersion()));
         log.info("Published {} evidence for {} to {}",
             pack.classification(), alert.incidentId(), ticket.key());
+        this.slack.evidenceCollected(alert, pack.classification());
 
         this.store.update(alert.incidentId(), IncidentRun::investigating);
         this.incidentDocuments.update(alert.incidentId(),
@@ -126,6 +134,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 current -> current.completed("no code change proposed: " + pack.classification()));
             this.incidentDocuments.update(alert.incidentId(),
                 current -> current.status(WorkflowStage.COMPLETED));
+            this.slack.noCodeAction(alert, pack.classification());
             return;
         }
 
@@ -162,10 +171,12 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             if (submission.pushed()) {
                 this.store.update(alert.incidentId(),
                     current -> current.draftPrCreated(submission.pullRequest().url()));
+                this.slack.fixProposed(alert, submission.pullRequest().url());
             }
             else {
                 this.store.update(alert.incidentId(),
                     current -> current.completed("fix prepared but push is disabled"));
+                this.slack.noCodeAction(alert, "fix prepared but push is disabled");
             }
         }
         catch (PatchValidationException exception) {
@@ -176,6 +187,7 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 current -> current.completed("fix rejected: " + exception.getMessage()));
             this.incidentDocuments.update(alert.incidentId(),
                 current -> current.aiOutput(routed.proposal()).status(WorkflowStage.COMPLETED));
+            this.slack.fixRejected(alert, exception.getMessage());
         }
     }
 
