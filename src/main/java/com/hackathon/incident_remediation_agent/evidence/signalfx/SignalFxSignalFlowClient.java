@@ -75,6 +75,15 @@ public final class SignalFxSignalFlowClient {
     }
 
     /**
+     * As {@link #query(SignalFxProgram, SignalFxService, Duration, Duration)}, but filters by
+     * {@code service}'s {@code k8s.namespace.name} instead of its {@code service.name} - use this
+     * for {@link SignalFxProgram#CPU_UTILIZATION} and {@link SignalFxProgram#MEMORY_UTILIZATION}.
+     */
+    public String queryByK8sNamespace(SignalFxProgram program, SignalFxService service, Duration lookback, Duration resolution) {
+        return query(program.forK8sNamespace(service), lookback, resolution);
+    }
+
+    /**
      * Runs a raw {@code program} over the window {@code [now - lookback, now]} and returns the
      * resolved data points as a JSON array string. Prefer
      * {@link #query(SignalFxProgram, SignalFxService, Duration, Duration)} for the common cases;

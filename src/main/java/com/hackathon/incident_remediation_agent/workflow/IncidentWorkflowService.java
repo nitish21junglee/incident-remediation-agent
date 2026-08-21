@@ -21,9 +21,11 @@ import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import com.hackathon.incident_remediation_agent.incident.IncidentRun;
 import com.hackathon.incident_remediation_agent.incident.IncidentRunStore;
+import com.hackathon.incident_remediation_agent.incident.WorkflowStage;
 import com.hackathon.incident_remediation_agent.jira.JiraClient;
 import com.hackathon.incident_remediation_agent.jira.JiraDocumentFactory;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
+import com.hackathon.incident_remediation_agent.persistence.IncidentDocumentStore;
 
 /**
  * Runs the incident investigation off the webhook thread.
@@ -48,10 +50,12 @@ public class IncidentWorkflowService implements IncidentWorkflow {
     private final FixGate gate;
     private final GitHubClient gitHubClient;
     private final IncidentRunStore store;
+    private final IncidentDocumentStore incidentDocuments;
 
     IncidentWorkflowService(JiraClient jiraClient, JiraDocumentFactory documents,
         EvidenceCollectionService evidence, AiRouter aiRouter, RepositoryResolver repositories,
-        FixGate gate, GitHubClient gitHubClient, IncidentRunStore store) {
+        FixGate gate, GitHubClient gitHubClient, IncidentRunStore store,
+        IncidentDocumentStore incidentDocuments) {
         this.jiraClient = jiraClient;
         this.documents = documents;
         this.evidence = evidence;
@@ -60,17 +64,21 @@ public class IncidentWorkflowService implements IncidentWorkflow {
         this.gate = gate;
         this.gitHubClient = gitHubClient;
         this.store = store;
+        this.incidentDocuments = incidentDocuments;
     }
 
     @Override
     @Async
     public void start(IncidentRun run) {
         IncidentAlert alert = run.alert();
+        this.incidentDocuments.start(alert.incidentId());
 
         JiraTicket ticket;
         try {
             ticket = this.jiraClient.createIncident(alert);
             this.store.update(alert.incidentId(), current -> current.jiraCreated(ticket.key()));
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.jiraCreated(ticket.key(), ticket.browseUrl()));
             log.info("Created Jira ticket {} ({}) for incident {}",
                 ticket.key(), ticket.browseUrl(), alert.incidentId());
         }
@@ -79,6 +87,8 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 alert.incidentId(), exception);
             this.store.update(alert.incidentId(),
                 current -> current.failed("jira ticket creation failed: " + exception.getMessage()));
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.status(WorkflowStage.FAILED));
             return;
         }
 
@@ -89,12 +99,16 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             log.error("Investigation failed for incident {}", alert.incidentId(), exception);
             this.store.update(alert.incidentId(),
                 current -> current.failed("investigation failed: " + exception.getMessage()));
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.status(WorkflowStage.FAILED));
         }
     }
 
     private void investigate(IncidentAlert alert, JiraTicket ticket) {
         this.store.update(alert.incidentId(), IncidentRun::collectingContext);
         EvidencePack pack = this.evidence.collect(alert, ticket);
+        this.incidentDocuments.update(alert.incidentId(),
+            current -> current.signalFxExports(pack.metrics()));
 
         String commentId = this.jiraClient.addComment(ticket, this.documents.contextComment(pack));
         this.store.update(alert.incidentId(),
@@ -103,11 +117,15 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             pack.classification(), alert.incidentId(), ticket.key());
 
         this.store.update(alert.incidentId(), IncidentRun::investigating);
+        this.incidentDocuments.update(alert.incidentId(),
+            current -> current.status(WorkflowStage.AI_INVESTIGATING));
         Optional<RoutedFix> routed = this.aiRouter.route(pack);
         if (routed.isEmpty()) {
             this.jiraClient.updateComment(ticket, commentId, this.documents.noCodeAction(pack));
             this.store.update(alert.incidentId(),
                 current -> current.completed("no code change proposed: " + pack.classification()));
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.status(WorkflowStage.COMPLETED));
             return;
         }
 
@@ -118,6 +136,8 @@ public class IncidentWorkflowService implements IncidentWorkflow {
         RoutedFix routed) {
 
         this.store.update(alert.incidentId(), IncidentRun::validating);
+        this.incidentDocuments.update(alert.incidentId(),
+            current -> current.status(WorkflowStage.VALIDATING));
         try {
             AgentProperties.RepositoryTarget target =
                 this.repositories.resolveByName(routed.repositoryName())
@@ -134,6 +154,11 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             this.jiraClient.updateComment(ticket, commentId,
                 this.documents.finalPrMessage(pack, routed.proposal(), submission));
 
+            WorkflowStage finalStatus =
+                submission.pushed() ? WorkflowStage.DRAFT_PR_CREATED : WorkflowStage.COMPLETED;
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.aiOutput(routed.proposal()).status(finalStatus));
+
             if (submission.pushed()) {
                 this.store.update(alert.incidentId(),
                     current -> current.draftPrCreated(submission.pullRequest().url()));
@@ -149,6 +174,8 @@ public class IncidentWorkflowService implements IncidentWorkflow {
                 this.documents.validationFailureMessage(routed.proposal(), exception));
             this.store.update(alert.incidentId(),
                 current -> current.completed("fix rejected: " + exception.getMessage()));
+            this.incidentDocuments.update(alert.incidentId(),
+                current -> current.aiOutput(routed.proposal()).status(WorkflowStage.COMPLETED));
         }
     }
 

@@ -43,6 +43,7 @@ import com.hackathon.incident_remediation_agent.incident.WorkflowStage;
 import com.hackathon.incident_remediation_agent.jira.JiraClient;
 import com.hackathon.incident_remediation_agent.jira.JiraDocumentFactory;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
+import com.hackathon.incident_remediation_agent.persistence.IncidentDocumentStore;
 
 import tools.jackson.databind.JsonNode;
 
@@ -75,6 +76,7 @@ class IncidentWorkflowServiceTest {
     private FixGate gate;
     private GitHubClient gitHubClient;
     private IncidentRunStore store;
+    private IncidentDocumentStore incidentDocuments;
     private IncidentWorkflowService workflow;
 
     @BeforeEach
@@ -87,8 +89,10 @@ class IncidentWorkflowServiceTest {
         this.gate = mock(FixGate.class);
         this.gitHubClient = mock(GitHubClient.class);
         this.store = new IncidentRunStore();
+        this.incidentDocuments = mock(IncidentDocumentStore.class);
         this.workflow = new IncidentWorkflowService(this.jiraClient, this.documents, this.evidence,
-            this.aiRouter, this.repositories, this.gate, this.gitHubClient, this.store);
+            this.aiRouter, this.repositories, this.gate, this.gitHubClient, this.store,
+            this.incidentDocuments);
         this.store.start(this.alert);
 
         when(this.jiraClient.createIncident(this.alert)).thenReturn(this.ticket);
