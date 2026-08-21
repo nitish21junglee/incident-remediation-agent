@@ -1,15 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import './index.css'
 
-// The row-hover particle/confetti/firework effects below fire a burst of emoji on every incident
-// status. Off by default — flip to true to bring them back.
-const SCREEN_EFFECTS_ENABLED = false
-
-const STAGES = [
-  'RECEIVED', 'JIRA_CREATED', 'COLLECTING_CONTEXT', 'JIRA_CONTEXT_PUBLISHED',
-  'AI_INVESTIGATING', 'VALIDATING', 'DRAFT_PR_CREATED', 'COMPLETED', 'FAILED', 'AI_SKIPPED'
-]
-
 const STAGE_LABELS = {
   RECEIVED: 'Received',
   JIRA_CREATED: 'Jira Created',
@@ -23,30 +14,17 @@ const STAGE_LABELS = {
   FAILED: 'Failed',
 }
 
-const STAGE_COLORS = {
-  RECEIVED: { bg: 'var(--blue-light)', border: 'var(--blue-border)', color: 'var(--blue)' },
-  JIRA_CREATED: { bg: 'var(--purple-light)', border: 'var(--purple-border)', color: 'var(--purple)' },
-  COLLECTING_CONTEXT: { bg: 'var(--yellow-light)', border: 'var(--yellow-border)', color: 'var(--yellow)' },
-  JIRA_CONTEXT_PUBLISHED: { bg: 'var(--teal-light)', border: 'var(--teal-border)', color: 'var(--teal)' },
-  AI_INVESTIGATING: { bg: 'var(--accent-light)', border: 'var(--accent-border)', color: 'var(--accent)' },
-  AI_SKIPPED: { bg: 'var(--accent-light)', border: 'var(--accent-border)', color: 'var(--accent)' },
-  VALIDATING: { bg: 'var(--yellow-light)', border: 'var(--yellow-border)', color: 'var(--yellow)' },
-  DRAFT_PR_CREATED: { bg: 'var(--purple-light)', border: 'var(--purple-border)', color: 'var(--purple)' },
-  COMPLETED: { bg: 'var(--green-light)', border: 'var(--green-border)', color: 'var(--green)' },
-  FAILED: { bg: 'var(--red-light)', border: 'var(--red-border)', color: 'var(--red)' },
-}
-
-const TIMELINE_ICONS = {
-  RECEIVED: { emoji: '⚡', cls: 'received' },
-  JIRA_CREATED: { emoji: '🎫', cls: 'jira' },
-  COLLECTING_CONTEXT: { emoji: '🔍', cls: 'evidence' },
-  JIRA_CONTEXT_PUBLISHED: { emoji: '📝', cls: 'jira' },
-  AI_INVESTIGATING: { emoji: '🧠', cls: 'evidence' },
-  AI_SKIPPED: { emoji: '⏭️', cls: 'skipped' },
-  VALIDATING: { emoji: '✅', cls: 'evidence' },
-  DRAFT_PR_CREATED: { emoji: '🛠️', cls: 'pr' },
-  COMPLETED: { emoji: '✅', cls: 'completed' },
-  FAILED: { emoji: '❌', cls: 'failed' },
+const TIMELINE_MARKS = {
+  RECEIVED: { text: 'RCV', cls: 'received' },
+  JIRA_CREATED: { text: 'JRA', cls: 'jira' },
+  COLLECTING_CONTEXT: { text: 'CTX', cls: 'evidence' },
+  JIRA_CONTEXT_PUBLISHED: { text: 'PUB', cls: 'jira' },
+  AI_INVESTIGATING: { text: 'AI', cls: 'evidence' },
+  AI_SKIPPED: { text: 'SKIP', cls: 'skipped' },
+  VALIDATING: { text: 'VAL', cls: 'evidence' },
+  DRAFT_PR_CREATED: { text: 'PR', cls: 'pr' },
+  COMPLETED: { text: 'OK', cls: 'completed' },
+  FAILED: { text: 'ERR', cls: 'failed' },
 }
 
 function formatTime(iso) {
@@ -108,17 +86,10 @@ function ErrorRateCell({ signalFxExports }) {
   )
 }
 
-const EFFECT_EMOJIS = {
-  explosion: ['💥', '🔥', '💣', '⚡', '🧨', '☠️', '🚨', '😱', '🆘', '⛔', '🌋', '💀'],
-  celebration: ['🎉', '🥳', '🎊', '✨', '🏆', '⭐', '🌟', '💫', '🎯', '👏', '🙌', '💪'],
-  received: ['⚡', '📩', '🔔', '📡', '🛎️', '📢', '🚀', '⏰', '🆕', '📥'],
-  jira: ['🎫', '📋', '✏️', '📝', '🗂️', '📌', '🏷️', '📑', '🔖', '📄'],
-  collecting: ['🔍', '🔬', '🧪', '📊', '🔎', '🧬', '📈', '🕵️', '💡', '📡'],
-  ai: ['🧠', '🤖', '⚙️', '💭', '🔮', '🧮', '💻', '🛡️', '🔧', '📐'],
-  pr: ['🛠️', '🔀', '📦', '🔧', '🏗️', '⚒️', '🧰', '📤', '🔩', '🪛'],
-  skipped: ['⏭️', '⏩', '🚫', '➡️', '⏯️', '🔜', '💤', '🙅', '🔇', '⏸️'],
-}
-const CONFETTI_COLORS = ['#6366f1', '#22c55e', '#f97316', '#3b82f6', '#ec4899', '#eab308', '#14b8a6', '#8b5cf6']
+// Every effect is built from plain colored shapes (dots, ribbons, sparks) in shades of blue and
+// white — no emoji glyphs — so the row-hover celebration/explosion effects can stay without
+// pulling a second color or any pictographs into the UI.
+const EFFECT_COLORS = ['var(--blue)', 'var(--blue-strong)', 'var(--blue-border)', '#ffffff']
 
 const STATUS_EFFECT_MAP = {
   FAILED: 'explosion',
@@ -131,17 +102,6 @@ const STATUS_EFFECT_MAP = {
   AI_SKIPPED: 'skipped',
   VALIDATING: 'ai',
   DRAFT_PR_CREATED: 'pr',
-}
-
-const FLASH_COLORS = {
-  explosion: 'red',
-  celebration: 'green',
-  received: 'blue',
-  jira: 'purple',
-  collecting: 'yellow',
-  ai: 'orange',
-  pr: 'purple',
-  skipped: 'orange',
 }
 
 function ScreenEffects({ type, origin }) {
@@ -170,18 +130,18 @@ function ScreenEffects({ type, origin }) {
     }
   }, [type, origin])
 
-  function doFlash(color, duration = 500) {
-    setFlash(color)
+  function doFlash(variant = 'blue', duration = 500) {
+    setFlash(variant)
     setTimeout(() => setFlash(null), duration)
   }
 
-  function spawnParticles(emojis, centers, { count = 10, spread = 500, sizeMin = 22, sizeMax = 30, dur = 2500 } = {}) {
+  function spawnParticles(centers, { count = 10, spread = 500, sizeMin = 6, sizeMax = 12, dur = 2500 } = {}) {
     const all = []
     centers.forEach((center, ci) => {
       for (let i = 0; i < count; i++) {
         all.push({
           id: Date.now() + ci * 100 + i,
-          emoji: emojis[(ci * 3 + i) % emojis.length],
+          color: EFFECT_COLORS[(ci * 3 + i) % EFFECT_COLORS.length],
           x: center.x + (Math.random() - 0.5) * 40,
           y: center.y + (Math.random() - 0.5) * 20,
           tx: (Math.random() - 0.5) * spread,
@@ -197,18 +157,14 @@ function ScreenEffects({ type, origin }) {
     setTimeout(() => setParticles([]), dur)
   }
 
-  function spawnConfetti(emojis, count = 50) {
+  function spawnConfetti(count = 50) {
     const vw = window.innerWidth
     const pieces = []
     for (let i = 0; i < count; i++) {
-      const isEmoji = Math.random() > 0.4
       pieces.push({
         id: Date.now() + i,
-        isEmoji,
-        emoji: isEmoji ? emojis[i % emojis.length] : null,
-        color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
+        color: EFFECT_COLORS[i % EFFECT_COLORS.length],
         x: Math.random() * vw,
-        size: isEmoji ? 18 + Math.random() * 16 : undefined,
         w: 8 + Math.random() * 8,
         h: 14 + Math.random() * 10,
         sway: (Math.random() - 0.5) * 200,
@@ -235,7 +191,7 @@ function ScreenEffects({ type, origin }) {
           x: cx, y: cy,
           fx: Math.cos(angle) * dist,
           fy: Math.sin(angle) * dist,
-          color: CONFETTI_COLORS[(ci * 5 + i) % CONFETTI_COLORS.length],
+          color: EFFECT_COLORS[(ci * 5 + i) % EFFECT_COLORS.length],
           delay: ci * 300 + Math.random() * 100,
           duration: 800 + Math.random() * 400,
         })
@@ -257,22 +213,22 @@ function ScreenEffects({ type, origin }) {
     ]
   }
 
-  // FAILED — full-screen explosions + screen shake
+  // FAILED — full-screen burst + screen shake
   function triggerExplosion() {
-    doFlash('red')
+    doFlash('strong')
     setShaking(true)
     setTimeout(() => setShaking(false), 500)
-    spawnParticles(EFFECT_EMOJIS.explosion, screenCenters(), { count: 12, spread: 600, sizeMax: 36 })
+    spawnParticles(screenCenters(), { count: 12, spread: 600, sizeMax: 16 })
   }
 
   // COMPLETED — confetti rain + fireworks
   function triggerCelebration() {
-    doFlash('green')
-    spawnConfetti(EFFECT_EMOJIS.celebration, 60)
+    doFlash('blue')
+    spawnConfetti(60)
     spawnFireworks(3)
   }
 
-  // RECEIVED — lightning bolts radiating from center + blue flash
+  // RECEIVED — sparks radiating from center
   function triggerReceived() {
     doFlash('blue')
     const vw = window.innerWidth, vh = window.innerHeight
@@ -282,35 +238,35 @@ function ScreenEffects({ type, origin }) {
       { x: vw * 0.2, y: vh * 0.5 },
       { x: vw * 0.8, y: vh * 0.4 },
     ]
-    spawnParticles(EFFECT_EMOJIS.received, centers, { count: 8, spread: 450, sizeMin: 24, sizeMax: 38 })
+    spawnParticles(centers, { count: 8, spread: 450, sizeMin: 6, sizeMax: 14 })
   }
 
-  // JIRA_CREATED / JIRA_CONTEXT_PUBLISHED — tickets flying + purple flash
+  // JIRA_CREATED / JIRA_CONTEXT_PUBLISHED — ribbons + sparks
   function triggerJira() {
-    doFlash('purple')
-    spawnConfetti(EFFECT_EMOJIS.jira, 40)
+    doFlash('blue')
+    spawnConfetti(40)
     const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles(EFFECT_EMOJIS.jira, [
+    spawnParticles([
       origin,
       { x: vw * 0.3, y: vh * 0.2 },
       { x: vw * 0.7, y: vh * 0.3 },
-    ], { count: 8, spread: 400, sizeMin: 20, sizeMax: 32 })
+    ], { count: 8, spread: 400, sizeMin: 6, sizeMax: 12 })
   }
 
-  // COLLECTING_CONTEXT — magnifying glasses scanning + yellow pulse
+  // COLLECTING_CONTEXT — scanning sparks
   function triggerCollecting() {
-    doFlash('yellow')
+    doFlash('blue')
     const vw = window.innerWidth, vh = window.innerHeight
     const scanPoints = []
     for (let i = 0; i < 5; i++) {
       scanPoints.push({ x: vw * (0.1 + i * 0.2), y: vh * (0.2 + Math.random() * 0.5) })
     }
-    spawnParticles(EFFECT_EMOJIS.collecting, [origin, ...scanPoints], { count: 6, spread: 350, sizeMin: 22, sizeMax: 34 })
+    spawnParticles([origin, ...scanPoints], { count: 6, spread: 350, sizeMin: 6, sizeMax: 12 })
   }
 
-  // AI_INVESTIGATING / VALIDATING — brain waves + neural sparks
+  // AI_INVESTIGATING / VALIDATING — sparks + fireworks
   function triggerAI() {
-    doFlash('orange')
+    doFlash('blue')
     const vw = window.innerWidth, vh = window.innerHeight
     const centers = [
       origin,
@@ -319,32 +275,32 @@ function ScreenEffects({ type, origin }) {
       { x: vw * 0.8, y: vh * 0.35 },
       { x: vw * 0.4, y: vh * 0.7 },
     ]
-    spawnParticles(EFFECT_EMOJIS.ai, centers, { count: 8, spread: 400, sizeMin: 24, sizeMax: 36 })
+    spawnParticles(centers, { count: 8, spread: 400, sizeMin: 6, sizeMax: 14 })
     spawnFireworks(2)
   }
 
-  // DRAFT_PR_CREATED — tools + gears flying + confetti
+  // DRAFT_PR_CREATED — ribbons + sparks
   function triggerPR() {
-    doFlash('purple')
-    spawnConfetti(EFFECT_EMOJIS.pr, 45)
+    doFlash('blue')
+    spawnConfetti(45)
     const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles(EFFECT_EMOJIS.pr, [
+    spawnParticles([
       origin,
       { x: vw * 0.25, y: vh * 0.3 },
       { x: vw * 0.75, y: vh * 0.25 },
       { x: vw * 0.5, y: vh * 0.6 },
-    ], { count: 8, spread: 450, sizeMin: 22, sizeMax: 34 })
+    ], { count: 8, spread: 450, sizeMin: 6, sizeMax: 12 })
   }
 
-  // AI_SKIPPED — skip icons drifting across
+  // AI_SKIPPED — a light drift of sparks
   function triggerSkipped() {
-    doFlash('orange', 300)
+    doFlash('blue', 300)
     const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles(EFFECT_EMOJIS.skipped, [
+    spawnParticles([
       origin,
       { x: vw * 0.3, y: vh * 0.3 },
       { x: vw * 0.7, y: vh * 0.5 },
-    ], { count: 7, spread: 350, sizeMin: 20, sizeMax: 30, dur: 2000 })
+    ], { count: 7, spread: 350, sizeMin: 5, sizeMax: 10, dur: 2000 })
   }
 
   if (!particles.length && !confetti.length && !fireworks.length && !flash) return null
@@ -361,35 +317,32 @@ function ScreenEffects({ type, origin }) {
             style={{
               left: p.x,
               top: p.y,
-              fontSize: p.size,
+              '--size': `${p.size}px`,
+              '--color': p.color,
               '--tx': `${p.tx}px`,
               '--ty': `${p.ty}px`,
               '--rot': `${p.rot}deg`,
               '--delay': `${p.delay}ms`,
               '--duration': `${p.duration}ms`,
             }}
-          >
-            {p.emoji}
-          </div>
+          />
         ))}
 
         {confetti.map(c => (
           <div
             key={c.id}
-            className={`confetti-piece ${c.isEmoji ? 'emoji' : 'ribbon'}`}
+            className="confetti-piece"
             style={{
               left: c.x,
               '--sway': `${c.sway}px`,
               '--spin': `${c.spin}deg`,
               '--delay': `${c.delay}ms`,
               '--fall-duration': `${c.fallDuration}ms`,
-              ...(c.isEmoji
-                ? { '--size': `${c.size}px` }
-                : { '--w': `${c.w}px`, '--h': `${c.h}px`, '--color': c.color }),
+              '--w': `${c.w}px`,
+              '--h': `${c.h}px`,
+              '--color': c.color,
             }}
-          >
-            {c.isEmoji ? c.emoji : null}
-          </div>
+          />
         ))}
 
         {fireworks.map(f => (
@@ -441,7 +394,6 @@ function IncidentsTable({ incidents, onSelect }) {
   const activeRow = useRef(null)
 
   const handleRowHover = (e, inc) => {
-    if (!SCREEN_EFFECTS_ENABLED) return
     if (activeRow.current === inc.incidentId) return
     activeRow.current = inc.incidentId
 
@@ -466,7 +418,7 @@ function IncidentsTable({ incidents, onSelect }) {
 
   return (
     <div className="table-section">
-      {SCREEN_EFFECTS_ENABLED && <ScreenEffects type={effectType} origin={effectOrigin} />}
+      <ScreenEffects type={effectType} origin={effectOrigin} />
       <div className="table-header">
         <h2>Incidents</h2>
         <span className="count-badge">{incidents.length}</span>
@@ -498,7 +450,6 @@ function IncidentsTable({ incidents, onSelect }) {
               >
                 <td>
                   <span className="incident-id">{inc.incidentId}</span>
-                  {inc.status === 'FAILED' && <span className="danger-sign">⚠️</span>}
                 </td>
                 <td>
                   {inc.jiraKey ? (
@@ -519,7 +470,7 @@ function IncidentsTable({ incidents, onSelect }) {
                 <td>
                   {inc.signalFxExports ? (
                     <span className={`latency-indicator ${inc.signalFxExports.latencyChanged ? 'changed' : 'unchanged'}`}>
-                      {inc.signalFxExports.latencyChanged ? '↑ Changed' : '✓ Normal'}
+                      {inc.signalFxExports.latencyChanged ? 'Changed' : 'Normal'}
                     </span>
                   ) : '-'}
                 </td>
@@ -552,10 +503,10 @@ function Timeline({ incidents }) {
       <div className="timeline-list">
         {items.length === 0 && <div className="empty-state">No activity</div>}
         {items.map(item => {
-          const icon = TIMELINE_ICONS[item.status] || TIMELINE_ICONS.RECEIVED
+          const mark = TIMELINE_MARKS[item.status] || TIMELINE_MARKS.RECEIVED
           return (
             <div className="timeline-item" key={item.id + item.status}>
-              <div className={`timeline-icon ${icon.cls}`}>{icon.emoji}</div>
+              <div className={`timeline-icon ${mark.cls}`}>{mark.text}</div>
               <div className="timeline-content">
                 <div className="timeline-title">
                   {item.id}{item.jiraKey ? ` • ${item.jiraKey}` : ''}
@@ -582,7 +533,11 @@ function DetailModal({ incident, onClose }) {
       <div className="modal" onClick={e => e.stopPropagation()}>
         <h2>
           <span>{incident.incidentId}</span>
-          <button className="modal-close" onClick={onClose}>✕</button>
+          <button className="modal-close" onClick={onClose} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
         </h2>
 
         <div className="detail-grid">

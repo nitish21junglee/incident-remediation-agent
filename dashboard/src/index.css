@@ -9,42 +9,42 @@
 }
 
 :root {
-  --bg: #f7f5f0;
+  /* Two colors in this UI: white, and shades/tints of one blue. Text and borders use
+     grayscale-with-a-blue-tint so they read as neutral, not as a third color. */
+  --bg: #f4f8fd;
   --surface: #ffffff;
-  --surface-hover: #faf9f7;
-  --border: #e8e5de;
-  --border-light: #f0ede6;
-  --text: #2d2b27;
-  --text-secondary: #6b6860;
-  --text-muted: #9c9890;
+  --surface-hover: #eaf2fc;
+  --border: #dbe7f7;
+  --border-light: #ecf3fb;
+  --text: #16324f;
+  --text-secondary: #4d6a89;
+  --text-muted: #8ba3bf;
 
-  --accent: #c76a15;
-  --accent-light: #fdf2e9;
-  --accent-border: #f5d0a9;
+  --blue: #2b6cb0;
+  --blue-light: #e6f0fb;
+  --blue-border: #b8d4f2;
+  --blue-strong: #1a4d85;
 
-  --green: #1a8a52;
-  --green-light: #e8f5ee;
-  --green-border: #b3dcc5;
-
-  --red: #d93025;
-  --red-light: #fce8e6;
-  --red-border: #f5b7b1;
-
-  --yellow: #b8860b;
-  --yellow-light: #fef9e7;
-  --yellow-border: #f9e79f;
-
-  --blue: #1a73e8;
-  --blue-light: #e8f0fe;
-  --blue-border: #a8c7fa;
-
-  --purple: #7c3aed;
-  --purple-light: #f3e8ff;
-  --purple-border: #c4b5fd;
-
-  --teal: #0d9488;
-  --teal-light: #e6fffa;
-  --teal-border: #99f6e4;
+  /* Aliases kept so every status/badge/link in the UI resolves to the same blue instead of
+     introducing a second hue. */
+  --accent: var(--blue);
+  --accent-light: var(--blue-light);
+  --accent-border: var(--blue-border);
+  --green: var(--blue-strong);
+  --green-light: var(--blue-light);
+  --green-border: var(--blue-border);
+  --red: var(--blue-strong);
+  --red-light: var(--blue-light);
+  --red-border: var(--blue-border);
+  --yellow: var(--blue);
+  --yellow-light: var(--blue-light);
+  --yellow-border: var(--blue-border);
+  --purple: var(--blue);
+  --purple-light: var(--blue-light);
+  --purple-border: var(--blue-border);
+  --teal: var(--blue);
+  --teal-light: var(--blue-light);
+  --teal-border: var(--blue-border);
 
   --radius: 12px;
   --radius-sm: 8px;
@@ -71,11 +71,11 @@ body::before {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 600px 400px at 10% 15%, rgba(99, 102, 241, 0.07) 0%, transparent 70%),
-    radial-gradient(ellipse 500px 350px at 85% 20%, rgba(249, 115, 22, 0.06) 0%, transparent 70%),
-    radial-gradient(ellipse 450px 300px at 50% 80%, rgba(34, 197, 94, 0.05) 0%, transparent 70%),
-    radial-gradient(ellipse 400px 350px at 20% 60%, rgba(236, 72, 153, 0.04) 0%, transparent 70%),
-    radial-gradient(ellipse 500px 400px at 75% 70%, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+    radial-gradient(ellipse 600px 400px at 10% 15%, rgba(43, 108, 176, 0.07) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 350px at 85% 20%, rgba(43, 108, 176, 0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 450px 300px at 50% 80%, rgba(43, 108, 176, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 400px 350px at 20% 60%, rgba(43, 108, 176, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 500px 400px at 75% 70%, rgba(43, 108, 176, 0.05) 0%, transparent 70%);
   animation: bgShift 20s ease-in-out infinite alternate;
 }
 
@@ -143,8 +143,8 @@ body::before {
 }
 
 @keyframes dotPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(26, 138, 82, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(26, 138, 82, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(43, 108, 176, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(43, 108, 176, 0); }
 }
 
 @keyframes slideDown {
@@ -523,43 +523,25 @@ body::before {
   transform: scale(1.05);
 }
 
-.status-badge.COMPLETED {
-  background: var(--green-light);
-  color: var(--green);
-  border-color: var(--green-border);
-}
-.status-badge.FAILED {
-  background: var(--red-light);
-  color: var(--red);
-  border-color: var(--red-border);
-}
+/* Every stage badge is the same blue outline treatment; FAILED is the one solid, filled
+   exception so it still reads as needing attention without introducing a second color. */
 .status-badge.RECEIVED,
-.status-badge.JIRA_CREATED {
+.status-badge.JIRA_CREATED,
+.status-badge.COLLECTING_CONTEXT,
+.status-badge.JIRA_CONTEXT_PUBLISHED,
+.status-badge.AI_INVESTIGATING,
+.status-badge.AI_SKIPPED,
+.status-badge.VALIDATING,
+.status-badge.DRAFT_PR_CREATED,
+.status-badge.COMPLETED {
   background: var(--blue-light);
   color: var(--blue);
   border-color: var(--blue-border);
 }
-.status-badge.COLLECTING_CONTEXT,
-.status-badge.AI_INVESTIGATING,
-.status-badge.VALIDATING {
-  background: var(--yellow-light);
-  color: var(--yellow);
-  border-color: var(--yellow-border);
-}
-.status-badge.DRAFT_PR_CREATED {
-  background: var(--purple-light);
-  color: var(--purple);
-  border-color: var(--purple-border);
-}
-.status-badge.AI_SKIPPED {
-  background: var(--accent-light);
-  color: var(--accent);
-  border-color: var(--accent-border);
-}
-.status-badge.JIRA_CONTEXT_PUBLISHED {
-  background: var(--teal-light);
-  color: var(--teal);
-  border-color: var(--teal-border);
+.status-badge.FAILED {
+  background: var(--blue-strong);
+  color: var(--surface);
+  border-color: var(--blue-strong);
 }
 
 .status-dot {
@@ -569,7 +551,6 @@ body::before {
   background: currentColor;
 }
 
-.status-badge.COMPLETED .status-dot,
 .status-badge.AI_INVESTIGATING .status-dot,
 .status-badge.COLLECTING_CONTEXT .status-dot {
   animation: pulse 1.8s ease-in-out infinite;
@@ -671,7 +652,10 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--blue);
   flex-shrink: 0;
   border: 1px solid transparent;
   transition: transform 0.2s ease;
@@ -862,46 +846,27 @@ body::before {
   font-size: 14px;
 }
 
-/* ── Failed row danger ── */
+/* ── Failed row glow ── */
 .incidents-table tbody tr.failed-row:hover td {
-  background: var(--red-light);
+  background: var(--blue-light);
 }
 
 .incidents-table tbody tr.failed-row:hover {
-  box-shadow: 0 0 20px rgba(217, 48, 37, 0.15);
+  box-shadow: 0 0 20px rgba(43, 108, 176, 0.2);
 }
 
 /* ── Completed row glow ── */
 .incidents-table tbody tr.completed-row:hover td {
-  background: var(--green-light);
+  background: var(--blue-light);
 }
 
 .incidents-table tbody tr.completed-row:hover {
-  box-shadow: 0 0 20px rgba(26, 138, 82, 0.15);
+  box-shadow: 0 0 20px rgba(43, 108, 176, 0.12);
 }
 
 /* ── Other row hover glows ── */
 .incidents-table tbody tr.effect-row:hover td {
   background: var(--surface-hover);
-}
-
-.danger-sign {
-  display: none;
-  font-size: 18px;
-  animation: shake 0.4s ease-in-out infinite;
-  margin-left: 6px;
-}
-
-.failed-row:hover .danger-sign {
-  display: inline;
-}
-
-@keyframes shake {
-  0%, 100% { transform: rotate(0deg); }
-  20% { transform: rotate(-12deg); }
-  40% { transform: rotate(12deg); }
-  60% { transform: rotate(-8deg); }
-  80% { transform: rotate(8deg); }
 }
 
 /* ── Effects overlay ── */
@@ -916,6 +881,10 @@ body::before {
 /* ── Explosions ── */
 .explosion-particle {
   position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--color);
   animation: explodeFull var(--duration) ease-out forwards;
   animation-delay: var(--delay);
   pointer-events: none;
@@ -949,48 +918,23 @@ body::before {
   animation: flash 0.5s ease-out forwards;
 }
 
-.screen-flash.red {
-  animation-name: flashRed;
+.screen-flash.blue {
+  animation-name: flashBlue;
 }
 
-.screen-flash.green {
-  animation-name: flashGreen;
-}
-
-@keyframes flashRed {
-  0% { background: rgba(217, 48, 37, 0.25); }
-  100% { background: transparent; }
-}
-
-@keyframes flashGreen {
-  0% { background: rgba(26, 138, 82, 0.15); }
-  100% { background: transparent; }
+.screen-flash.strong {
+  animation-name: flashStrong;
 }
 
 @keyframes flashBlue {
-  0% { background: rgba(59, 130, 246, 0.18); }
+  0% { background: rgba(43, 108, 176, 0.15); }
   100% { background: transparent; }
 }
 
-@keyframes flashPurple {
-  0% { background: rgba(124, 58, 237, 0.15); }
+@keyframes flashStrong {
+  0% { background: rgba(26, 77, 133, 0.28); }
   100% { background: transparent; }
 }
-
-@keyframes flashYellow {
-  0% { background: rgba(234, 179, 8, 0.15); }
-  100% { background: transparent; }
-}
-
-@keyframes flashOrange {
-  0% { background: rgba(249, 115, 22, 0.15); }
-  100% { background: transparent; }
-}
-
-.screen-flash.blue { animation-name: flashBlue; }
-.screen-flash.purple { animation-name: flashPurple; }
-.screen-flash.yellow { animation-name: flashYellow; }
-.screen-flash.orange { animation-name: flashOrange; }
 
 /* ── Screen shake ── */
 .screen-shake {
@@ -1013,20 +957,13 @@ body::before {
 .confetti-piece {
   position: absolute;
   top: -20px;
-  animation: confettiFall var(--fall-duration) linear forwards;
-  animation-delay: var(--delay);
-  opacity: 0;
-}
-
-.confetti-piece.emoji {
-  font-size: var(--size);
-}
-
-.confetti-piece.ribbon {
   width: var(--w);
   height: var(--h);
   background: var(--color);
   border-radius: 2px;
+  animation: confettiFall var(--fall-duration) linear forwards;
+  animation-delay: var(--delay);
+  opacity: 0;
 }
 
 @keyframes confettiFall {
