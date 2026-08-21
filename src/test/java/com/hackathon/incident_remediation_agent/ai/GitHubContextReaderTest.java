@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.util.List;
@@ -21,12 +22,15 @@ class GitHubContextReaderTest {
 
     private static final String BASE = "https://api.github.com";
 
-    private static final String SOURCE =
-        "src/main/java/com/flutter/reward_service/service/KafkaConsumer.java";
+    private static final String WRITABLE = "src/main/java/com/flutter/reward_service/";
+
+    private static final String SOURCE = WRITABLE + "service/KafkaConsumer.java";
+
+    private static final String OTHER = WRITABLE + "service/impl/RewardServiceImpl.java";
 
     private static final AgentProperties.RepositoryTarget TARGET =
         new AgentProperties.RepositoryTarget(
-            "Flutter-Global/darsrftp-service", "dev", List.of(SOURCE));
+            "Flutter-Global/darsrftp-service", "dev", List.of("src/main/java/"), List.of(WRITABLE));
 
     private MockRestServiceServer server;
 
@@ -91,21 +95,50 @@ class GitHubContextReaderTest {
             .withMessageContaining("unsupported characters");
     }
 
+    /** Paths are derived from the incident, so over budget means read less, not fail the run. */
     @Test
-    void refusesContentOverTheBudget() {
+    void stopsAtTheCharacterBudgetInsteadOfFailing() {
+        expectRead(SOURCE, "x".repeat(60_000));
+        expectRead(OTHER, "y".repeat(60_000));
+
+        Map<String, String> files = this.reader.read(TARGET, List.of(SOURCE, OTHER));
+
+        assertThat(files).containsOnlyKeys(SOURCE);
+    }
+
+    /** A stack frame can name a class that is not in this repository or not on this branch. */
+    @Test
+    void skipsAFileThatIsNotOnTheBranch() {
         this.server.expect(requestTo(
                 BASE + "/repos/Flutter-Global/darsrftp-service/contents/" + SOURCE + "?ref=dev"))
-            .andRespond(withSuccess("x".repeat(100_001), MediaType.TEXT_PLAIN));
+            .andRespond(withResourceNotFound());
+        expectRead(OTHER, "class RewardServiceImpl {}");
 
+        Map<String, String> files = this.reader.read(TARGET, List.of(SOURCE, OTHER));
+
+        this.server.verify();
+        assertThat(files).containsOnlyKeys(OTHER);
+    }
+
+    /** The prefix list is the allowlist, so a derived path outside it must never be fetched. */
+    @Test
+    void refusesAPathOutsideTheWritablePaths() {
         assertThatExceptionOfType(IllegalArgumentException.class)
-            .isThrownBy(() -> this.reader.read(TARGET, List.of(SOURCE)))
-            .withMessageContaining("exceeds");
+            .isThrownBy(() -> this.reader.read(
+                TARGET, List.of("src/main/java/com/someone/else/Secret.java")))
+            .withMessageContaining("outside the repository's writable paths");
+    }
+
+    private void expectRead(String path, String body) {
+        this.server.expect(requestTo(
+                BASE + "/repos/Flutter-Global/darsrftp-service/contents/" + path + "?ref=dev"))
+            .andRespond(withSuccess(body, MediaType.TEXT_PLAIN));
     }
 
     @Test
     void refusesAMalformedRepositorySlug() {
         AgentProperties.RepositoryTarget malformed =
-            new AgentProperties.RepositoryTarget("not-a-slug", "dev", List.of(SOURCE));
+            new AgentProperties.RepositoryTarget("not-a-slug", "dev", List.of("src/main/java/"), List.of(WRITABLE));
 
         assertThatExceptionOfType(IllegalArgumentException.class)
             .isThrownBy(() -> this.reader.read(malformed, List.of(SOURCE)))

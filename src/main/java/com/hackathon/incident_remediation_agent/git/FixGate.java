@@ -2,7 +2,6 @@ package com.hackathon.incident_remediation_agent.git;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.springframework.stereotype.Component;
 
@@ -52,25 +51,30 @@ public class FixGate {
                 .formatted(proposed.size(), this.maxChangedFiles));
         }
 
-        Set<String> allowed = Set.copyOf(target.contextFiles());
         for (Map.Entry<String, String> file : proposed.entrySet()) {
             String path = file.getKey();
             String content = file.getValue();
 
-            if (!allowed.contains(path)) {
-                // The model only ever saw the allowlisted files; anything else is invention.
+            if (!isWritable(path, target)) {
                 throw new PatchValidationException(
-                    "Proposal writes to %s, which is not a configured context file".formatted(path));
+                    "Proposal writes to %s, which is outside the repository's writable paths"
+                        .formatted(path));
             }
             if (isProtected(path)) {
                 throw new PatchValidationException("Proposal writes to protected path " + path);
+            }
+            if (!originals.containsKey(path)) {
+                // Files are chosen per incident now, so the writable paths alone no longer say
+                // which ones the model saw. It cannot have rewritten a file it was never given.
+                throw new PatchValidationException(
+                    "Proposal writes to %s, which the model was not given".formatted(path));
             }
             if (content == null || content.isBlank()) {
                 throw new PatchValidationException("Proposal empties " + path);
             }
 
             String original = originals.get(path);
-            if (original != null && content.length() < original.length() * MAX_SHRINK) {
+            if (content.length() < original.length() * MAX_SHRINK) {
                 throw new PatchValidationException(
                     "Proposal shrinks %s from %d to %d characters, which looks like a truncated "
                         .formatted(path, original.length(), content.length())
@@ -85,5 +89,10 @@ public class FixGate {
 
     private boolean isProtected(String path) {
         return this.protectedPaths.stream().anyMatch(path::startsWith);
+    }
+
+    private static boolean isWritable(String path, AgentProperties.RepositoryTarget target) {
+        List<String> writable = target.writablePaths() == null ? List.of() : target.writablePaths();
+        return writable.stream().anyMatch(path::startsWith);
     }
 }

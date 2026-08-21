@@ -48,17 +48,13 @@ class HttpSplunkCollectorTest {
         this.collector = new HttpSplunkCollector(builder, properties(BASE + "/"));
     }
 
-    /**
-     * The recorded response is what the mock endpoint actually returns, including its
-     * {@code text/html} content type.
-     */
     @Test
     void foldsTheEndpointResponseIntoLogEvidence() {
         respondWith(readMockResponse());
 
         LogEvidence evidence = collector.collect(alert);
 
-        assertThat(evidence.errorCount()).isEqualTo(12);
+        assertThat(evidence.errorCount()).isEqualTo(3);
         assertThat(evidence.topError())
             .isEqualTo("java.lang.IllegalStateException: Simulated popup failure for userId=1");
         assertThat(evidence.sourceUrl()).isEqualTo(URI.create(SEARCH_LINK));
@@ -133,6 +129,11 @@ class HttpSplunkCollectorTest {
             .andRespond(withSuccess(body, MediaType.TEXT_HTML));
     }
 
+    /**
+     * One trace lifted verbatim from what the mock endpoint returns — all three loggers and all
+     * three payload shapes ({@code exception}, {@code http}, {@code context}) — served with the
+     * endpoint's real {@code text/html} content type.
+     */
     private static String readMockResponse() {
         try (InputStream stream = HttpSplunkCollectorTest.class
             .getResourceAsStream("/splunk-fetch-logs.json")) {

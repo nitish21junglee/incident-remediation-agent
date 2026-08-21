@@ -54,7 +54,7 @@ class IncidentWorkflowServiceTest {
     private static final String CONTEXT_FILE = "src/main/java/Mapper.java";
 
     private static final AgentProperties.RepositoryTarget TARGET =
-        new AgentProperties.RepositoryTarget("acme/demo-api", "dev", List.of(CONTEXT_FILE));
+        new AgentProperties.RepositoryTarget("acme/demo-api", "dev", List.of("src/main/java/"), List.of(CONTEXT_FILE));
 
     private final IncidentAlert alert = new IncidentAlert(
         "01JDEMOEVENT",

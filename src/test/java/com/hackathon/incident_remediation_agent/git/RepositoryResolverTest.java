@@ -19,7 +19,7 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 class RepositoryResolverTest {
 
     private static final AgentProperties.RepositoryTarget DEMO =
-        new AgentProperties.RepositoryTarget("acme/demo-api", "dev",
+        new AgentProperties.RepositoryTarget("acme/demo-api", "dev", List.of("src/main/java/"),
             List.of("src/main/java/Mapper.java"));
 
     private static final Map<String, AgentProperties.RepositoryTarget> KNOWN =
@@ -55,16 +55,16 @@ class RepositoryResolverTest {
     @Test
     void rejectsTargetsMissingARepositorySlug() {
         RepositoryResolver resolver = resolver(Map.of("demo-api",
-            new AgentProperties.RepositoryTarget("  ", "dev",
+            new AgentProperties.RepositoryTarget("  ", "dev", List.of("src/main/java/"),
                 List.of("f.java"))), Map.of("PDEMO", "demo-api"));
 
         assertThat(resolver.resolve(alert("PDEMO"))).isEmpty();
     }
 
     @Test
-    void rejectsTargetsWithNoContextFiles() {
+    void rejectsTargetsWithNoWritablePaths() {
         RepositoryResolver resolver = resolver(Map.of("demo-api",
-            new AgentProperties.RepositoryTarget("acme/demo-api", "dev",
+            new AgentProperties.RepositoryTarget("acme/demo-api", "dev", List.of("src/main/java/"),
                 List.of())), Map.of("PDEMO", "demo-api"));
 
         assertThat(resolver.resolve(alert("PDEMO"))).isEmpty();

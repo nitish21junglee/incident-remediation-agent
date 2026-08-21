@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -54,6 +55,9 @@ public class HttpSplunkCollector implements SplunkCollector {
     /** Samples are quoted verbatim into a Jira comment and an AI prompt, so the list is bounded. */
     private static final int MAX_SAMPLED_EVENTS = 10;
 
+    /** Bound on the raw body echoed into the log, so a large response cannot flood it. */
+    private static final int MAX_LOGGED_BODY_CHARACTERS = 4_000;
+
     private static final LogEvidence NO_LOGS = new LogEvidence(0, null, List.of(), null);
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -83,13 +87,34 @@ public class HttpSplunkCollector implements SplunkCollector {
     private JsonNode fetch(IncidentAlert alert) {
         try {
             String body = this.restClient.get().uri(LOGS_PATH).retrieve().body(String.class);
+            log.info("Log endpoint {} returned {} characters for incident {}: {}", LOGS_PATH,
+                body == null ? 0 : body.length(), alert.incidentId(), truncate(body));
             return body == null || body.isBlank() ? null : this.objectMapper.readTree(body);
         }
         catch (RestClientException | JacksonException exception) {
-            log.warn("Log fetch failed for incident {}; collecting no logs",
-                alert.incidentId(), exception);
+            log.warn("Log fetch failed for incident {}; collecting no logs. Response body: {}",
+                alert.incidentId(), truncate(errorBody(exception)), exception);
             return null;
         }
+    }
+
+    /**
+     * The error body, which {@code retrieve()} raises as an exception rather than returning. An
+     * expired mock answers 404 with a JSON explanation, and without this that explanation is lost.
+     */
+    private static String errorBody(Exception exception) {
+        return exception instanceof HttpStatusCodeException status
+            ? status.getStatusCode() + " " + status.getResponseBodyAsString()
+            : null;
+    }
+
+    private static String truncate(String body) {
+        if (body == null) {
+            return "<none>";
+        }
+        return body.length() <= MAX_LOGGED_BODY_CHARACTERS
+            ? body
+            : body.substring(0, MAX_LOGGED_BODY_CHARACTERS) + "... (" + body.length() + " total)";
     }
 
     private static List<JsonNode> errorEvents(JsonNode events) {

@@ -1,5 +1,6 @@
 package com.hackathon.incident_remediation_agent.ai;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -29,13 +30,16 @@ public class AiRouter {
 
     private final AiFixClient aiFixClient;
     private final AiRepositorySelector repositorySelector;
+    private final StackFrameFileSelector fileSelector;
     private final GitHubContextReader contextReader;
     private final RepositoryResolver repositories;
 
     AiRouter(AiFixClient aiFixClient, AiRepositorySelector repositorySelector,
-             GitHubContextReader contextReader, RepositoryResolver repositories) {
+             StackFrameFileSelector fileSelector, GitHubContextReader contextReader,
+             RepositoryResolver repositories) {
         this.aiFixClient = aiFixClient;
         this.repositorySelector = repositorySelector;
+        this.fileSelector = fileSelector;
         this.contextReader = contextReader;
         this.repositories = repositories;
     }
@@ -69,8 +73,21 @@ public class AiRouter {
         }
         AgentProperties.RepositoryTarget target = resolved.get();
 
-        Map<String, String> repositoryFiles =
-            this.contextReader.read(target, target.contextFiles());
+        // Which files, decided per incident from the evidence rather than from configuration. No
+        // frames inside the repository means nothing worth showing a model, not a blind guess.
+        List<String> contextPaths = this.fileSelector.select(pack.logs(), target);
+        if (contextPaths.isEmpty()) {
+            log.info("No stack frame in the evidence for {} points at a file in {}",
+                pack.ticket().key(), chosen.get());
+            return Optional.empty();
+        }
+
+        Map<String, String> repositoryFiles = this.contextReader.read(target, contextPaths);
+        if (repositoryFiles.isEmpty()) {
+            log.info("None of the frame-derived files for {} could be read from {}",
+                pack.ticket().key(), chosen.get());
+            return Optional.empty();
+        }
 
         FixProposal proposal = this.aiFixClient.propose(pack, repositoryFiles);
         if (proposal == null || !proposal.probableFix()) {

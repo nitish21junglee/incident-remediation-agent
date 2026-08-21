@@ -43,8 +43,8 @@ class RestGitHubClientTest {
         "src/main/java/com/flutter/reward_service/service/KafkaConsumer.java";
 
     private static final AgentProperties.RepositoryTarget TARGET =
-        new AgentProperties.RepositoryTarget(
-            "Flutter-Global/darsrftp-service", "dev", List.of(SOURCE));
+        new AgentProperties.RepositoryTarget("Flutter-Global/darsrftp-service", "dev",
+            List.of("src/main/java/"), List.of(SOURCE));
 
     private static final FixProposal PROPOSAL = new FixProposal(true,
         "RewardEvent.getPayload() can be null",

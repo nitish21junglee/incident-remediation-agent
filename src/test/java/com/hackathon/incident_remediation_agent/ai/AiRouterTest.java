@@ -30,9 +30,14 @@ import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 
 class AiRouterTest {
 
-    private static final String CONTEXT_FILE = "src/main/java/Mapper.java";
+    private static final String WRITABLE_PATH = "src/main/java/com/acme/demo/";
+
+    private static final String CONTEXT_FILE = WRITABLE_PATH + "Mapper.java";
 
     private static final String CONTEXT_CONTENT = "class Mapper {}";
+
+    /** The frame that has to choose {@link #CONTEXT_FILE}, since configuration no longer does. */
+    private static final String FRAME = "\tat com.acme.demo.Mapper.map(Mapper.java:44)";
 
     private static final FixProposal PROPOSAL = new FixProposal(
         true, "null payment type", "Handle missing payment type",
@@ -159,6 +164,41 @@ class AiRouterTest {
         assertThat(router.route(pack("application_error"))).isEmpty();
     }
 
+    /** Configuration no longer names a file, so evidence that names none means nothing to send. */
+    @Test
+    void skipsWhenNoStackFramePointsIntoTheRepository() {
+        EvidencePack pack = new EvidencePack(alert(), ticket(),
+            new LogEvidence(143, "NullPointerException", List.of(
+                "\tat org.springframework.web.servlet.DispatcherServlet.doGet(DispatcherServlet.java:1072)",
+                "\tat java.base/java.lang.Thread.run(Thread.java:1583)"), null),
+            metrics(), deployment(), "application_error", "v1");
+
+        assertThat(router.route(pack)).isEmpty();
+        verifyNoAiCall();
+    }
+
+    /** Every frame-derived path can turn out not to be on the branch. That is not a fix. */
+    @Test
+    void skipsWhenNoneOfTheChosenFilesCouldBeRead() {
+        when(this.contextReader.read(any(), any())).thenReturn(Map.of());
+
+        assertThat(router.route(pack("application_error"))).isEmpty();
+        verifyNoAiCall();
+    }
+
+    @Test
+    void sendsOnlyTheFilesTheFramesNamed() {
+        when(aiFixClient.propose(any(), anyMap())).thenReturn(PROPOSAL);
+
+        router.route(pack("application_error"));
+
+        verify(contextReader).read(any(), eqList(List.of(CONTEXT_FILE)));
+    }
+
+    private static List<String> eqList(List<String> expected) {
+        return org.mockito.ArgumentMatchers.argThat(actual -> expected.equals(actual));
+    }
+
     private void verifyNoAiCall() {
         verify(aiFixClient, never()).propose(any(), anyMap());
     }
@@ -170,10 +210,10 @@ class AiRouterTest {
             new AgentProperties.GitHub("https://api.github.com", "token",
                 "agent/incident", false, 5, List.of(".github/workflows/"),
                 Map.of("demo-api", new AgentProperties.RepositoryTarget(
-                    "acme/demo-api", "dev", List.of(CONTEXT_FILE))),
+                    "acme/demo-api", "dev", List.of("src/main/java/"), List.of(WRITABLE_PATH))),
                 Map.of(mappedServiceId, "demo-api")));
-        return new AiRouter(aiFixClient, repositorySelector, contextReader,
-            new RepositoryResolver(properties));
+        return new AiRouter(aiFixClient, repositorySelector, new StackFrameFileSelector(),
+            contextReader, new RepositoryResolver(properties));
     }
 
     private EvidencePack pack(String classification) {
@@ -192,7 +232,7 @@ class AiRouterTest {
     }
 
     private static LogEvidence logs(String topError) {
-        return new LogEvidence(143, topError, List.of("sample one", "sample two"),
+        return new LogEvidence(143, topError, List.of(topError, FRAME),
             URI.create("https://splunk.example/app/search"));
     }
 

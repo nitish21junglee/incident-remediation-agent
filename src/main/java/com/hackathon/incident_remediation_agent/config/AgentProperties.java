@@ -74,13 +74,21 @@ public record AgentProperties(
     ) {}
 
     /**
-     * @param slug         the {@code owner/name} used against the GitHub API
-     * @param baseBranch   branch the fix branch is cut from and the pull request targets
-     * @param contextFiles repository-relative paths that may be read and may be rewritten
+     * @param slug          the {@code owner/name} used against the GitHub API
+     * @param baseBranch    branch the fix branch is cut from and the pull request targets
+     * @param sourceRoots   repository-relative directories where package hierarchies start, for
+     *                      example {@code src/main/java/}. Stated rather than guessed: a stack
+     *                      frame carries a package, and only the layout says where that package
+     *                      begins on disk.
+     * @param writablePaths repository-relative path prefixes that may be read and may be
+     *                      rewritten. Prefixes rather than exact files, because which file is at
+     *                      fault is decided per incident from the stack frames in the evidence;
+     *                      this bounds where that decision is allowed to land.
      */
     public record RepositoryTarget(
         String slug,
         String baseBranch,
-        List<String> contextFiles
+        List<String> sourceRoots,
+        List<String> writablePaths
     ) {}
 }

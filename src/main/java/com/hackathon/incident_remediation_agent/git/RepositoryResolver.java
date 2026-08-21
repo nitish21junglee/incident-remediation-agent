@@ -15,7 +15,7 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 /**
  * Finds the repository that owns a failing service, in two configured hops: the PagerDuty service
  * id selects a short repository name, and that name selects the GitHub slug, base branch and the
- * files that may be read and rewritten.
+ * paths that may be read and rewritten.
  *
  * <p>The name-to-target map is an allowlist. A repository absent from it can never be read or
  * written, whatever the incident text, log samples or model output happen to say. That
@@ -103,8 +103,11 @@ public class RepositoryResolver {
         if (isBlank(target.slug())) {
             return "no GitHub slug";
         }
-        if (target.contextFiles() == null || target.contextFiles().isEmpty()) {
-            return "no context files";
+        if (target.sourceRoots() == null || target.sourceRoots().isEmpty()) {
+            return "no source roots";
+        }
+        if (target.writablePaths() == null || target.writablePaths().isEmpty()) {
+            return "no writable paths";
         }
         return null;
     }

@@ -24,8 +24,10 @@ class FixGateTest {
     private static final String ORIGINAL = "class KafkaConsumer { void consume() { body(); } }";
 
     private static final AgentProperties.RepositoryTarget TARGET =
-        new AgentProperties.RepositoryTarget(
-            "Flutter-Global/darsrftp-service", "dev", List.of(SOURCE, TEST));
+        new AgentProperties.RepositoryTarget("Flutter-Global/darsrftp-service", "dev",
+            List.of("src/main/java/", "src/test/java/"),
+            List.of("src/main/java/com/flutter/reward_service/",
+                "src/test/java/com/flutter/reward_service/"));
 
     private final FixGate gate = gate(5, List.of(".github/workflows/", "infrastructure/"));
 
@@ -38,17 +40,30 @@ class FixGateTest {
     }
 
     @Test
-    void rejectsAPathOutsideTheConfiguredContextFiles() {
+    void rejectsAPathOutsideTheWritablePaths() {
         assertThatExceptionOfType(PatchValidationException.class)
             .isThrownBy(() -> gate.check(
-                Map.of("src/main/java/Other.java", "class Other {}"), Map.of(), TARGET))
-            .withMessageContaining("not a configured context file");
+                Map.of("src/main/java/com/someone/else/Other.java", "class Other {}"),
+                Map.of(), TARGET))
+            .withMessageContaining("outside the repository's writable paths");
+    }
+
+    /**
+     * The writable paths are a whole subtree now, so they no longer say which files the model
+     * actually saw. Only the files it was given can have been rewritten.
+     */
+    @Test
+    void rejectsAWritablePathTheModelWasNeverGiven() {
+        assertThatExceptionOfType(PatchValidationException.class)
+            .isThrownBy(() -> gate.check(
+                Map.of(TEST, "class KafkaConsumerTest {}"), Map.of(SOURCE, ORIGINAL), TARGET))
+            .withMessageContaining("the model was not given");
     }
 
     @Test
     void rejectsProtectedPaths() {
         AgentProperties.RepositoryTarget target = new AgentProperties.RepositoryTarget(
-            "Flutter-Global/darsrftp-service", "dev", List.of(".github/workflows/ci.yaml"));
+            "Flutter-Global/darsrftp-service", "dev", List.of("src/main/java/"), List.of(".github/workflows/"));
 
         assertThatExceptionOfType(PatchValidationException.class)
             .isThrownBy(() -> gate.check(
