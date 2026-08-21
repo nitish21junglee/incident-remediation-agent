@@ -134,7 +134,7 @@ class JiraDocumentFactoryTest {
 
         assertThat(text)
             .contains("Error rate during: ")
-            .contains("No code investigation started")
+            .contains("No code change proposed")
             .contains("infrastructure_or_dependency");
     }
 
@@ -212,10 +212,11 @@ class JiraDocumentFactoryTest {
                     "\tat com.flutter.reward_service.service.KafkaConsumer"
                         + ".consumeRewardEvent(KafkaConsumer.java:142)"),
                 URI.create("https://splunk.example/app/search")),
-            new MetricEvidence(0.001, 0.4, true, URI.create("https://signalfx.example/dashboard")),
+            new MetricEvidence(0.001, 0.4, true, URI.create("https://signalfx.example/dashboard"),
+                List.of()),
             new DeploymentEvidence("v1.4.2", "abc123", null,
                 Instant.parse("2026-08-14T02:04:00Z")),
-            classification, "evidence-sha");
+            null, classification, "evidence-sha");
     }
 
     private static List<String> blockTypes(JsonNode document) {

@@ -222,11 +222,12 @@ class IncidentWorkflowServiceTest {
         return new EvidencePack(this.alert, this.ticket,
             new LogEvidence(143, "NullPointerException", List.of("sample"),
                 URI.create("https://splunk.example/app/search")),
-            new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard")),
+            new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard"),
+                List.of()),
             new DeploymentEvidence("v1.4.2", "abc123",
                 URI.create("https://github.com/acme/demo-api/commit/abc123"),
                 Instant.parse("2026-08-14T01:55:00Z")),
-            classification, EVIDENCE_VERSION);
+            null, classification, EVIDENCE_VERSION);
     }
 
     private IncidentRun storedRun() {

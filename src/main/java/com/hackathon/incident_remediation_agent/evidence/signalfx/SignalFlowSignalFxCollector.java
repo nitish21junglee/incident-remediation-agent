@@ -4,8 +4,10 @@ import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
+import com.hackathon.incident_remediation_agent.evidence.SignalFxExport;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 
 import tools.jackson.databind.JsonNode;
@@ -44,7 +47,28 @@ public class SignalFlowSignalFxCollector implements SignalFxCollector {
     /** Latency has to move by more than this factor before it counts as a change. */
     private static final double LATENCY_CHANGE_FACTOR = 1.5;
 
-    private static final MetricEvidence NO_METRICS = new MetricEvidence(0, 0, false, null);
+    /**
+     * Scoped by {@code service.name}. These three produce the error rate and latency signal
+     * {@code EvidenceClassifier} decides on, so losing any of them means no metric evidence.
+     */
+    private static final List<SignalFxProgram> SERVICE_PROGRAMS = List.of(
+        SignalFxProgram.ERROR_COUNT, SignalFxProgram.REQUEST_COUNT, SignalFxProgram.LATENCY_BY_URI);
+
+    /**
+     * Scoped by {@code k8s.namespace.name}, because container metrics are published per pod and do
+     * not carry {@code service.name}. Additive context: nothing downstream classifies on them.
+     */
+    private static final List<SignalFxProgram> NAMESPACE_PROGRAMS = List.of(
+        SignalFxProgram.CPU_UTILIZATION, SignalFxProgram.MEMORY_UTILIZATION);
+
+    /**
+     * Guard on what is handed to Mongo. Past this the raw export is dropped rather than truncated:
+     * half a JSON array cannot be read back, and the aggregates carry the signal regardless.
+     */
+    private static final int MAX_STORED_RAW_CHARACTERS = 500_000;
+
+    private static final MetricEvidence NO_METRICS =
+        new MetricEvidence(0, 0, false, null, List.of());
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final SignalFxSignalFlowClient client;
@@ -62,32 +86,53 @@ public class SignalFlowSignalFxCollector implements SignalFxCollector {
 
     @Override
     public MetricEvidence collect(IncidentAlert alert) {
-        Optional<SignalFxService> service = resolveService(alert);
-        if (service.isEmpty()) {
+        Optional<SignalFxService> resolved = resolveService(alert);
+        if (resolved.isEmpty()) {
             log.warn("No SignalFx service matches '{}' and agent.signalfx.default-service is unset; "
                 + "collecting no metrics", alert.serviceName());
             return NO_METRICS;
         }
-
+        SignalFxService service = resolved.get();
         Duration lookback = lookbackFor(alert);
         Instant splitAt = splitPoint(alert, lookback);
 
-        try {
-            Window errors = window(SignalFxProgram.ERROR_COUNT, service.get(), lookback, splitAt);
-            Window requests = window(SignalFxProgram.REQUEST_COUNT, service.get(), lookback, splitAt);
-            Window latency = window(SignalFxProgram.LATENCY_BY_URI, service.get(), lookback, splitAt);
+        List<SignalFxExport> exports = new ArrayList<>();
+        Map<SignalFxProgram, Window> windows = new EnumMap<>(SignalFxProgram.class);
 
-            return new MetricEvidence(
-                rate(errors.beforeTotal(), requests.beforeTotal()),
-                rate(errors.duringTotal(), requests.duringTotal()),
-                latencyChanged(latency),
-                this.dashboardUrl);
+        try {
+            for (SignalFxProgram program : SERVICE_PROGRAMS) {
+                windows.put(program, run(program, service, lookback, splitAt, false, exports));
+            }
         }
         catch (SignalFxQueryException exception) {
             log.warn("SignalFx query failed for {}; continuing without metrics",
                 alert.incidentId(), exception);
             return NO_METRICS;
         }
+
+        // Tolerated one at a time: the container metrics are extra context, and the k8s namespace
+        // they need is a second guess at what the incident's service is called. Losing them must
+        // not cost the error-rate evidence that has already been collected.
+        for (SignalFxProgram program : NAMESPACE_PROGRAMS) {
+            try {
+                run(program, service, lookback, splitAt, true, exports);
+            }
+            catch (SignalFxQueryException exception) {
+                log.warn("SignalFx {} failed for {}; continuing without it",
+                    program, alert.incidentId(), exception);
+                exports.add(SignalFxExport.failed(program.name(),
+                    service.toK8sNamespaceFilterClause(), exception.getMessage()));
+            }
+        }
+
+        Window errors = windows.get(SignalFxProgram.ERROR_COUNT);
+        Window requests = windows.get(SignalFxProgram.REQUEST_COUNT);
+        return new MetricEvidence(
+            rate(errors.beforeTotal(), requests.beforeTotal()),
+            rate(errors.duringTotal(), requests.duringTotal()),
+            latencyChanged(windows.get(SignalFxProgram.LATENCY_BY_URI)),
+            this.dashboardUrl,
+            List.copyOf(exports));
     }
 
     /**
@@ -143,15 +188,43 @@ public class SignalFlowSignalFxCollector implements SignalFxCollector {
         return windowStart.plus(lookback.dividedBy(2));
     }
 
-    private Window window(
+    /** Runs one program, records its export, and returns its split window. */
+    private Window run(
         SignalFxProgram program,
         SignalFxService service,
         Duration lookback,
-        Instant splitAt
+        Instant splitAt,
+        boolean byNamespace,
+        List<SignalFxExport> exports
     ) {
-        String json = this.client.query(program, service, lookback, RESOLUTION);
-        log.info("SignalFx {} response for {}: {}", program, service.filterValue(), json);
-        return split(parse(json), splitAt);
+        String filter = byNamespace
+            ? service.toK8sNamespaceFilterClause()
+            : service.toFilterClause();
+        String json = byNamespace
+            ? this.client.queryByK8sNamespace(program, service, lookback, RESOLUTION)
+            : this.client.query(program, service, lookback, RESOLUTION);
+        log.info("SignalFx {} response for {}: {}", program, filter, json);
+
+        List<Point> points = parse(json);
+        Window window = split(points, splitAt);
+        exports.add(new SignalFxExport(
+            program.name(),
+            filter,
+            points.size(),
+            SignalFxExport.Aggregate.of(window.before()),
+            SignalFxExport.Aggregate.of(window.during()),
+            storable(program, json),
+            null));
+        return window;
+    }
+
+    private static String storable(SignalFxProgram program, String json) {
+        if (json != null && json.length() > MAX_STORED_RAW_CHARACTERS) {
+            log.warn("SignalFx {} returned {} characters, over the {} character store budget; "
+                + "keeping the aggregates only", program, json.length(), MAX_STORED_RAW_CHARACTERS);
+            return null;
+        }
+        return json;
     }
 
     private List<Point> parse(String json) {
