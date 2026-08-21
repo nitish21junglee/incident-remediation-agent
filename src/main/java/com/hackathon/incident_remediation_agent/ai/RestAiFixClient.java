@@ -1,6 +1,5 @@
 package com.hackathon.incident_remediation_agent.ai;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,8 +9,6 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
-import org.springframework.boot.http.client.HttpClientSettings;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -67,17 +64,6 @@ public class RestAiFixClient implements AiFixClient {
         unrelated code.
         """;
 
-    /**
-     * Overrides the 10 seconds {@code RestClientConfiguration} gives every other adapter. The
-     * model is asked for whole files, so a proposal that rewrites a 50 KB source file is tens of
-     * thousands of output tokens and takes minutes to stream. The call already runs off the
-     * webhook thread, so waiting costs latency on an async investigation and nothing else.
-     */
-    private static final Duration READ_TIMEOUT = Duration.ofMinutes(4);
-
-    /** Connecting is not the slow part; a provider that will not answer should fail fast. */
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
-
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
     private final AiModelSelector models;
@@ -87,8 +73,6 @@ public class RestAiFixClient implements AiFixClient {
         this.models = models;
         this.restClient = builder
             .baseUrl(ai.baseUrl().replaceAll("/+$", ""))
-            .requestFactory(ClientHttpRequestFactoryBuilder.detect().build(
-                HttpClientSettings.defaults().withTimeouts(CONNECT_TIMEOUT, READ_TIMEOUT)))
             .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + ai.apiKey())
             .build();
     }

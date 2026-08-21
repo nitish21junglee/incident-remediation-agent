@@ -52,6 +52,9 @@ public final class SignalFxSignalFlowClient {
     private static final String INTERNAL_PROPERTY_PREFIX = "sf_";
     private static final String COMPUTATION_ID_PROPERTY = "computationId";
 
+    /** This client builds its own HttpClient, so {@code RestClientConfiguration} does not reach it. */
+    private static final Duration TIMEOUT = Duration.ofMinutes(5);
+
     private final String token;
     private final String baseUrl;
     private final HttpClient httpClient;
@@ -61,7 +64,7 @@ public final class SignalFxSignalFlowClient {
         this.token = Objects.requireNonNull(token, "token");
         this.baseUrl = "https://api." + Objects.requireNonNull(realm, "realm") + ".signalfx.com";
         this.httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
+            .connectTimeout(TIMEOUT)
             .build();
         this.objectMapper = new ObjectMapper();
     }
@@ -104,7 +107,7 @@ public final class SignalFxSignalFlowClient {
             .uri(URI.create(baseUrl + "/v2/signalflow/execute?" + queryString))
             .header("X-SF-TOKEN", token)
             .header("Content-Type", "text/plain")
-            .timeout(Duration.ofSeconds(30))
+            .timeout(TIMEOUT)
             .POST(HttpRequest.BodyPublishers.ofString(program))
             .build();
 
