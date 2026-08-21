@@ -1,0 +1,10 @@
+target/
+.git/
+.env
+.vscode/
+.devcontainer/
+demo/
+docs/
+output.txt
+output2.txt
+parse.js
