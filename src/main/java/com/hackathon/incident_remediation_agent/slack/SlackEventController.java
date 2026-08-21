@@ -126,12 +126,12 @@ public class SlackEventController {
         String incidentId = urlMatcher.group(1);
         String incidentUrl = urlMatcher.group(0);
         return Optional.of(buildAlert(event, incidentId, extractTitle(text, event),
-            extractServiceFromText(cleanText), URI.create(incidentUrl)));
+            extractServiceFromText(cleanText, event), URI.create(incidentUrl)));
     }
 
     private Optional<IncidentAlert> buildFromAlertText(JsonNode event, String cleanText) {
         String title = cleanText.lines().findFirst().orElse(cleanText).strip();
-        String serviceName = extractServiceFromText(cleanText);
+        String serviceName = extractServiceFromText(cleanText, event);
         String incidentId = "SLACK-" + event.path("ts").asString().replace(".", "");
         return Optional.of(buildAlert(event, incidentId, title, serviceName, URI.create("")));
     }
@@ -165,10 +165,25 @@ public class SlackEventController {
             || (URGENCY_PATTERN.matcher(text).find() && SERVICE_PATTERN.matcher(text).find());
     }
 
-    private String extractServiceFromText(String text) {
-        Matcher m = SERVICE_PATTERN.matcher(text);
-        if (m.find()) {
-            return m.group(1).strip();
+    /**
+     * PagerDuty's own Slack messages carry the service in an attachment field rather than in the
+     * text, so the text pattern is tried first and the fields are the fallback. Losing the name
+     * costs the SignalFx service match and the repository hint, so both shapes are read.
+     */
+    private String extractServiceFromText(String text, JsonNode event) {
+        Matcher matcher = SERVICE_PATTERN.matcher(text);
+        if (matcher.find()) {
+            return matcher.group(1).strip();
+        }
+        for (JsonNode attachment : event.path("attachments")) {
+            for (JsonNode field : attachment.path("fields")) {
+                if ("Service".equalsIgnoreCase(field.path("title").asString("").strip())) {
+                    String value = field.path("value").asString("").strip();
+                    if (!value.isEmpty()) {
+                        return value;
+                    }
+                }
+            }
         }
         return "unknown";
     }

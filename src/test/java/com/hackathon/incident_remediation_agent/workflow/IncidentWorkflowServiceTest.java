@@ -44,6 +44,7 @@ import com.hackathon.incident_remediation_agent.jira.JiraClient;
 import com.hackathon.incident_remediation_agent.jira.JiraDocumentFactory;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 import com.hackathon.incident_remediation_agent.persistence.IncidentDocumentStore;
+import com.hackathon.incident_remediation_agent.slack.SlackNotifier;
 
 import tools.jackson.databind.JsonNode;
 
@@ -77,6 +78,7 @@ class IncidentWorkflowServiceTest {
     private GitHubClient gitHubClient;
     private IncidentRunStore store;
     private IncidentDocumentStore incidentDocuments;
+    private SlackNotifier slack;
     private IncidentWorkflowService workflow;
 
     @BeforeEach
@@ -90,9 +92,10 @@ class IncidentWorkflowServiceTest {
         this.gitHubClient = mock(GitHubClient.class);
         this.store = new IncidentRunStore();
         this.incidentDocuments = mock(IncidentDocumentStore.class);
+        this.slack = mock(SlackNotifier.class);
         this.workflow = new IncidentWorkflowService(this.jiraClient, this.documents, this.evidence,
             this.aiRouter, this.repositories, this.gate, this.gitHubClient, this.store,
-            this.incidentDocuments);
+            this.incidentDocuments, this.slack);
         this.store.start(this.alert);
 
         when(this.jiraClient.createIncident(this.alert)).thenReturn(this.ticket);

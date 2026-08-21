@@ -40,6 +40,10 @@ class SlackEventControllerTest {
     @MockitoBean
     IncidentWorkflow workflow;
 
+    /** Not part of the web slice, and the controller now takes it. */
+    @MockitoBean
+    SlackNotifier slackNotifier;
+
     @Test
     void handlesUrlVerificationChallenge() throws Exception {
         String body = """
