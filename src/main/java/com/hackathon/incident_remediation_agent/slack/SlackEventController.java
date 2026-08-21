@@ -4,6 +4,7 @@ import java.net.URI;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,8 +40,13 @@ public class SlackEventController {
     private static final Pattern INCIDENT_TYPE_PATTERN =
         Pattern.compile("Incident type:\\s*(.+)", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern SLACK_LINK_PATTERN =
-        Pattern.compile("<[^|>]+\\|([^>]+)>");
+    /**
+     * Subtypes that re-announce or mutate an existing message rather than deliver new content.
+     * "bot_message" is intentionally NOT here: PagerDuty's Slack integration posts alerts as a
+     * bot, so filtering it out would drop every real incident trigger.
+     */
+    private static final Set<String> IGNORED_SUBTYPES =
+        Set.of("message_changed", "message_deleted", "message_replied");
 
     private final IncidentRunStore store;
     private final IncidentWorkflow workflow;
@@ -82,24 +88,23 @@ public class SlackEventController {
             return ResponseEntity.ok().build();
         }
 
-        String subtype = event.path("subtype").asString();
-        if (subtype != null
-            && !subtype.isEmpty()
-            && !"bot_message".equals(subtype)) {
-            log.debug("Ignoring message with subtype={}", subtype);
+        if (IGNORED_SUBTYPES.contains(event.path("subtype").asString(""))) {
             return ResponseEntity.ok().build();
         }
 
+        String messageTs = event.path("ts").asString();
+        String channel = event.path("channel").asString();
+        slackNotifier.acknowledgeMessage(channel, messageTs);
+
         Optional<IncidentAlert> alert = extractIncidentFromMessage(event);
         if (alert.isEmpty()) {
+            log.info("Slack message in {} did not match an incident pattern; ts={}", channel, messageTs);
             return ResponseEntity.ok().build();
         }
 
         IncidentAlert incident = alert.get();
         log.info("Incident detected from Slack: {} ({})", incident.incidentId(), incident.title());
 
-        String messageTs = event.path("ts").asString();
-        String channel = event.path("channel").asString();
         slackNotifier.registerThread(incident.incidentId(), channel, messageTs);
 
         Optional<IncidentRun> started = store.start(incident);
@@ -151,12 +156,12 @@ public class SlackEventController {
         String incidentId = urlMatcher.group(1);
         String incidentUrl = urlMatcher.group(0);
         return Optional.of(buildAlert(event, incidentId, extractTitle(text, event),
-            extractServiceFromText(cleanText), URI.create(incidentUrl)));
+            extractServiceFromText(cleanText, event), URI.create(incidentUrl)));
     }
 
     private Optional<IncidentAlert> buildFromAlertText(JsonNode event, String cleanText) {
         String title = cleanText.lines().findFirst().orElse(cleanText).strip();
-        String serviceName = extractServiceFromText(cleanText);
+        String serviceName = extractServiceFromText(cleanText, event);
         String incidentId = "SLACK-" + event.path("ts").asString().replace(".", "");
         return Optional.of(buildAlert(event, incidentId, title, serviceName, URI.create("")));
     }
@@ -195,16 +200,25 @@ public class SlackEventController {
             || (URGENCY_PATTERN.matcher(text).find() && SERVICE_PATTERN.matcher(text).find());
     }
 
-    private String extractServiceFromText(String text) {
-        Matcher m = SERVICE_PATTERN.matcher(text);
-        if (m.find()) {
-            String raw = m.group(1).strip();
-            // Slack link format: <url|display text> — extract display text
-            Matcher linkMatcher = SLACK_LINK_PATTERN.matcher(raw);
-            if (linkMatcher.find()) {
-                return linkMatcher.group(1).strip();
+    /**
+     * PagerDuty's own Slack messages carry the service in an attachment field rather than in the
+     * text, so the text pattern is tried first and the fields are the fallback. Losing the name
+     * costs the SignalFx service match and the repository hint, so both shapes are read.
+     */
+    private String extractServiceFromText(String text, JsonNode event) {
+        Matcher matcher = SERVICE_PATTERN.matcher(text);
+        if (matcher.find()) {
+            return matcher.group(1).strip();
+        }
+        for (JsonNode attachment : event.path("attachments")) {
+            for (JsonNode field : attachment.path("fields")) {
+                if ("Service".equalsIgnoreCase(field.path("title").asString("").strip())) {
+                    String value = field.path("value").asString("").strip();
+                    if (!value.isEmpty()) {
+                        return value;
+                    }
+                }
             }
-            return raw;
         }
         return "unknown";
     }

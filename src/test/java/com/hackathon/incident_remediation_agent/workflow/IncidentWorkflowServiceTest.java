@@ -44,6 +44,7 @@ import com.hackathon.incident_remediation_agent.jira.JiraClient;
 import com.hackathon.incident_remediation_agent.jira.JiraDocumentFactory;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 import com.hackathon.incident_remediation_agent.persistence.IncidentDocumentStore;
+import com.hackathon.incident_remediation_agent.slack.SlackNotifier;
 
 import tools.jackson.databind.JsonNode;
 
@@ -77,6 +78,7 @@ class IncidentWorkflowServiceTest {
     private GitHubClient gitHubClient;
     private IncidentRunStore store;
     private IncidentDocumentStore incidentDocuments;
+    private SlackNotifier slack;
     private IncidentWorkflowService workflow;
 
     @BeforeEach
@@ -90,9 +92,10 @@ class IncidentWorkflowServiceTest {
         this.gitHubClient = mock(GitHubClient.class);
         this.store = new IncidentRunStore();
         this.incidentDocuments = mock(IncidentDocumentStore.class);
+        this.slack = mock(SlackNotifier.class);
         this.workflow = new IncidentWorkflowService(this.jiraClient, this.documents, this.evidence,
             this.aiRouter, this.repositories, this.gate, this.gitHubClient, this.store,
-            this.incidentDocuments);
+            this.incidentDocuments, this.slack);
         this.store.start(this.alert);
 
         when(this.jiraClient.createIncident(this.alert)).thenReturn(this.ticket);
@@ -222,11 +225,12 @@ class IncidentWorkflowServiceTest {
         return new EvidencePack(this.alert, this.ticket,
             new LogEvidence(143, "NullPointerException", List.of("sample"),
                 URI.create("https://splunk.example/app/search")),
-            new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard")),
+            new MetricEvidence(0.4, 6.1, false, URI.create("https://signalfx.example/dashboard"),
+                List.of()),
             new DeploymentEvidence("v1.4.2", "abc123",
                 URI.create("https://github.com/acme/demo-api/commit/abc123"),
                 Instant.parse("2026-08-14T01:55:00Z")),
-            classification, EVIDENCE_VERSION);
+            null, classification, EVIDENCE_VERSION);
     }
 
     private IncidentRun storedRun() {

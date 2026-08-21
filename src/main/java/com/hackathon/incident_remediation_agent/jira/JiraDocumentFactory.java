@@ -8,6 +8,7 @@ import com.hackathon.incident_remediation_agent.ai.FixProposal;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
 import com.hackathon.incident_remediation_agent.evidence.LogEvidence;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
+import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
 import com.hackathon.incident_remediation_agent.git.FixSubmission;
 import com.hackathon.incident_remediation_agent.git.PatchValidationException;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
@@ -71,11 +72,12 @@ public class JiraDocumentFactory {
         evidenceFacts(blocks, pack);
         logSamples(blocks, pack.logs());
 
-        heading(blocks, "No code investigation started");
+        heading(blocks, "No code change proposed");
         paragraph(blocks).add(text(
-            "The evidence was classified as '%s', so no code change was proposed. This needs a "
+            "The evidence was investigated and classified as '%s', but no code change came out of "
                 .formatted(pack.classification())
-                + "human to look at infrastructure or dependencies."));
+                + "it: either nothing in the logs pointed at a file this agent may change, or the "
+                + "model declined to propose one. This needs a human."));
 
         return document;
     }
@@ -153,7 +155,29 @@ public class JiraDocumentFactory {
         if (pack.deployment() != null && pack.deployment().version() != null) {
             fact(facts, "Deployed version", pack.deployment().version());
         }
+        // What last landed on the branch, so the gap between a release and an incident is on the
+        // ticket rather than something the reader has to go and reconstruct.
+        RepositoryChange.PullRequest lastPull =
+            pack.change() == null ? null : pack.change().lastPullRequest();
+        if (lastPull != null) {
+            fact(facts, "Last merged pull request", "#%d %s".formatted(
+                lastPull.number(), lastPull.title()));
+            fact(facts, "Merged at", String.valueOf(lastPull.mergedAt()));
+        }
 
+        if (pack.change() != null && pack.change().revertPullRequest() != null) {
+            fact(facts, "Revert pull request",
+                "#" + pack.change().revertPullRequest().number());
+        }
+
+        if (pack.change() != null && pack.change().revertPullRequest() != null) {
+            paragraph(blocks).add(link("Open the revert pull request",
+                pack.change().revertPullRequest().url()));
+        }
+        if (lastPull != null && lastPull.url() != null) {
+            paragraph(blocks).add(link(
+                "Open pull request #" + lastPull.number(), lastPull.url()));
+        }
         if (logs != null && logs.sourceUrl() != null) {
             paragraph(blocks).add(link("Open the Splunk search", logs.sourceUrl()));
         }

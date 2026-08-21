@@ -20,6 +20,7 @@ public class SlackNotifier {
 
     private static final Logger log = LoggerFactory.getLogger(SlackNotifier.class);
     private static final String SLACK_API = "https://slack.com/api/chat.postMessage";
+    private static final String REACTIONS_API = "https://slack.com/api/reactions.add";
 
     private final RestClient restClient;
     private final String botToken;
@@ -35,6 +36,36 @@ public class SlackNotifier {
 
     public void registerThread(String incidentId, String channelId, String threadTs) {
         this.threads.put(incidentId, new ThreadInfo(channelId, threadTs));
+    }
+
+    public void acknowledgeMessage(String channelId, String ts) {
+        if (botToken.isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> body = Map.of(
+                "channel", channelId,
+                "timestamp", ts,
+                "name", "eyes");
+
+            Map<?, ?> response = this.restClient.post()
+                .uri(URI.create(REACTIONS_API))
+                .header("Authorization", "Bearer " + botToken)
+                .body(body)
+                .retrieve()
+                .body(Map.class);
+
+            logIfSlackError("reactions.add", response);
+        }
+        catch (RuntimeException exception) {
+            log.warn("Failed to acknowledge Slack message: {}", exception.getMessage());
+        }
+    }
+
+    private static void logIfSlackError(String apiMethod, Map<?, ?> response) {
+        if (response != null && Boolean.FALSE.equals(response.get("ok"))) {
+            log.warn("Slack {} rejected the request: {}", apiMethod, response.get("error"));
+        }
     }
 
     public void incidentReceived(IncidentAlert alert) {
@@ -94,12 +125,14 @@ public class SlackNotifier {
             body.put("thread_ts", threadTs);
             body.put("blocks", blocks);
 
-            this.restClient.post()
+            Map<?, ?> response = this.restClient.post()
                 .uri(URI.create(SLACK_API))
                 .header("Authorization", "Bearer " + botToken)
                 .body(body)
                 .retrieve()
-                .toBodilessEntity();
+                .body(Map.class);
+
+            logIfSlackError("chat.postMessage", response);
         }
         catch (RuntimeException exception) {
             log.warn("Failed to post Slack thread reply: {}", exception.getMessage());

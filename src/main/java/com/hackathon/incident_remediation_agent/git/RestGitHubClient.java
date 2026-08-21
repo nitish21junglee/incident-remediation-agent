@@ -14,11 +14,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 
 import com.hackathon.incident_remediation_agent.ai.FixProposal;
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
+import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
 
 import tools.jackson.databind.JsonNode;
 
@@ -110,6 +112,162 @@ public class RestGitHubClient implements GitHubClient {
         log.info("Opened draft pull request {} on {} for {}",
             pullRequest.url(), target.slug(), pack.ticket().key());
         return new FixSubmission(branch, commitSha, changedFiles, pullRequest);
+    }
+
+    @Override
+    public DraftPullRequest revert(
+        EvidencePack pack,
+        RepositoryChange change,
+        AgentProperties.RepositoryTarget target
+    ) {
+        if (change == null || change.commitSha() == null) {
+            return null;
+        }
+        JsonNode head = this.restClient.get()
+            .uri(api(target, "/commits/" + require(SAFE_REF, change.commitSha(), "commit sha")))
+            .retrieve()
+            .body(JsonNode.class);
+
+        JsonNode parents = head.path("parents");
+        if (parents.isEmpty()) {
+            log.warn("{} has no parent; nothing to revert to", change.commitSha());
+            return null;
+        }
+        // The first parent, matching how GitHub diffed this commit in the first place: for a
+        // merged pull request that is the branch tip it merged into, so reverting undoes the
+        // whole pull request rather than one commit of it.
+        String parentSha = parents.get(0).path("sha").asString();
+
+        List<String> paths = new ArrayList<>();
+        head.path("files").forEach(file -> {
+            String path = file.path("filename").asString(null);
+            if (path != null) {
+                paths.add(path);
+            }
+        });
+        if (paths.isEmpty()) {
+            log.warn("{} changed no files; nothing to revert", change.commitSha());
+            return null;
+        }
+
+        String branch = "%s/revert-%s".formatted(this.branchPrefix, abbreviate(change.commitSha()));
+        if (!this.pushEnabled) {
+            log.warn("agent.github.push-enabled is false; not writing to {}. Would have created "
+                + "branch {} reverting {} across {}",
+                target.slug(), branch, abbreviate(change.commitSha()), paths);
+            return null;
+        }
+
+        String baseSha = baseCommitSha(target);
+        String baseTreeSha = treeShaOf(target, baseSha);
+        Map<String, String> modes = modesFor(target, baseTreeSha, paths);
+
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (String path : paths) {
+            String before = contentAt(target, path, parentSha);
+            if (before == null) {
+                // The commit added this file, so putting it back means removing it. A null sha is
+                // how the tree API expresses a deletion.
+                Map<String, Object> deletion = new LinkedHashMap<>();
+                deletion.put("path", path);
+                deletion.put("mode", modes.getOrDefault(path, DEFAULT_FILE_MODE));
+                deletion.put("type", "blob");
+                deletion.put("sha", null);
+                entries.add(deletion);
+            }
+            else {
+                entries.add(Map.of(
+                    "path", path,
+                    "mode", modes.getOrDefault(path, DEFAULT_FILE_MODE),
+                    "type", "blob",
+                    "sha", createBlob(target, before)));
+            }
+        }
+
+        String treeSha = post(target, "/git/trees",
+            Map.of("base_tree", baseTreeSha, "tree", entries)).get("sha").asString();
+        String commitSha = post(target, "/git/commits", Map.of(
+            "message", revertMessage(change),
+            "tree", treeSha,
+            "parents", List.of(baseSha))).get("sha").asString();
+        post(target, "/git/refs", Map.of("ref", "refs/heads/" + branch, "sha", commitSha));
+
+        DraftPullRequest draft = openRevertDraft(pack, change, target, branch, paths);
+        log.info("Opened revert draft pull request {} on {} undoing {} for {}",
+            draft.url(), target.slug(), abbreviate(change.commitSha()), pack.ticket().key());
+        return draft;
+    }
+
+    /** @return the file's content at {@code ref}, or null when it did not exist there */
+    private String contentAt(AgentProperties.RepositoryTarget target, String path, String ref) {
+        try {
+            return this.restClient.get()
+                .uri("/repos/" + require(SAFE_SLUG, target.slug(), "repository slug")
+                    + "/contents/" + require(SAFE_REF, path, "file path") + "?ref=" + ref)
+                .accept(MediaType.valueOf("application/vnd.github.raw"))
+                .retrieve()
+                .body(String.class);
+        }
+        catch (HttpClientErrorException.NotFound notFound) {
+            return null;
+        }
+    }
+
+    private DraftPullRequest openRevertDraft(
+        EvidencePack pack,
+        RepositoryChange change,
+        AgentProperties.RepositoryTarget target,
+        String branch,
+        List<String> paths
+    ) {
+        StringBuilder body = new StringBuilder();
+        body.append("Opened by the incident remediation agent for **")
+            .append(pack.ticket().key()).append("**.\n\n");
+        body.append("Puts every file touched by `").append(abbreviate(change.commitSha()))
+            .append("` back to its content at the commit before it.\n\n");
+        if (change.lastPullRequest() != null) {
+            body.append("Reverts #").append(change.lastPullRequest().number())
+                .append(" (merged ").append(change.lastPullRequest().mergedAt()).append(").\n\n");
+        }
+        body.append("Files:\n");
+        paths.forEach(path -> body.append("- `").append(path).append("`\n"));
+        body.append("\nThis is a rollback, not a fix. Nothing here diagnoses the incident.\n");
+
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("title", "[%s] Revert %s".formatted(pack.ticket().key(), headline(change)));
+        request.put("head", branch);
+        request.put("base", target.baseBranch());
+        request.put("body", body.toString());
+        request.put("draft", true);
+
+        JsonNode response = post(target, "/pulls", request);
+        JsonNode draft = response.get("draft");
+        if (draft == null || !draft.asBoolean()) {
+            throw new IllegalStateException(
+                "GitHub created a non-draft pull request on " + target.slug()
+                    + "; draft pull requests may be disabled for this repository");
+        }
+        return new DraftPullRequest(
+            response.get("number").asLong(),
+            URI.create(response.get("html_url").asString()));
+    }
+
+    private static String revertMessage(RepositoryChange change) {
+        return "Revert \"%s\"\n\nThis reverts commit %s."
+            .formatted(headline(change), change.commitSha());
+    }
+
+    private static String headline(RepositoryChange change) {
+        if (change.lastPullRequest() != null) {
+            return "#%d %s".formatted(
+                change.lastPullRequest().number(), change.lastPullRequest().title());
+        }
+        String message = change.commitMessage();
+        return message == null ? abbreviate(change.commitSha()) : message.lines().findFirst().orElse("");
+    }
+
+    private static String abbreviate(String sha) {
+        return sha == null || sha.length() < 8 ? sha : sha.substring(0, 8);
     }
 
     private String baseCommitSha(AgentProperties.RepositoryTarget target) {

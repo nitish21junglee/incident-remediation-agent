@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Applies the 10-second connect/read timeouts to every auto-configured
+ * Applies the five-minute connect/read timeouts to every auto-configured
  * {@code RestClient.Builder}.
  *
  * <p>Adapters must inject {@code RestClient.Builder} and call {@code .baseUrl(...)} in their own
@@ -19,7 +19,19 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RestClientConfiguration {
 
-    private static final Duration TIMEOUT = Duration.ofSeconds(10);
+    /**
+     * Five minutes on both connect and read, for every adapter behind this builder.
+     *
+     * <p>Ten seconds was too short for a real incident: the log endpoint answers in well under a
+     * second from a developer machine and repeatedly took longer than ten from the deployed
+     * container, so the fetch was cancelled mid-flight and the run collected nothing. That is not
+     * a small loss, because no logs means no stack frames and no stack frames means no files.
+     *
+     * <p>Every call behind this builder runs off the webhook thread, so waiting costs latency on
+     * an async investigation and nothing else. The trade is deliberate: an unreachable host now
+     * holds a run open for five minutes rather than failing fast.
+     */
+    private static final Duration TIMEOUT = Duration.ofMinutes(5);
 
     @Bean
     RestClientCustomizer timeoutRestClientCustomizer() {

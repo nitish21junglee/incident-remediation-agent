@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import java.net.URI;
@@ -25,6 +26,7 @@ import com.hackathon.incident_remediation_agent.evidence.DeploymentEvidence;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
 import com.hackathon.incident_remediation_agent.evidence.LogEvidence;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
+import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 
@@ -194,6 +196,97 @@ class RestGitHubClientTest {
             .andRespond(withSuccess("{\"tree\":[],\"truncated\":false}", MediaType.APPLICATION_JSON));
     }
 
+    /** A rollback is still a write, so the same flag has to hold it back. */
+    @Test
+    void revertWritesNothingWhenPushIsDisabled() {
+        givenPushEnabled(false);
+        server.expect(requestTo(REPO + "/commits/033f961b")).andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(HEAD_COMMIT, MediaType.APPLICATION_JSON));
+
+        assertThat(client.revert(pack(), change(), TARGET)).isNull();
+
+        server.verify();
+    }
+
+    /**
+     * A revert is the file's content at the commit before, not a guess at what it used to say, so
+     * the blob has to come from the parent sha.
+     */
+    @Test
+    void revertPutsEachTouchedFileBackToItsParentContent() {
+        server.expect(requestTo(REPO + "/commits/033f961b")).andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(HEAD_COMMIT, MediaType.APPLICATION_JSON));
+        expectBaseRefLookup();
+        server.expect(requestTo(REPO + "/contents/" + SOURCE + "?ref=parent-sha"))
+            .andRespond(withSuccess("class KafkaConsumer { before(); }", MediaType.TEXT_PLAIN));
+
+        server.expect(requestTo(REPO + "/git/blobs")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.content").value("class KafkaConsumer { before(); }"))
+            .andRespond(withSuccess("{\"sha\":\"old-blob\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/git/trees")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.tree[0].sha").value("old-blob"))
+            .andRespond(withSuccess("{\"sha\":\"revert-tree\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/git/commits")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.message").value(
+                "Revert \"#290 bug\"\n\nThis reverts commit 033f961b."))
+            .andRespond(withSuccess("{\"sha\":\"revert-commit\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/git/refs")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.ref").value("refs/heads/agent/incident/revert-033f961b"))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/pulls")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.draft").value(true))
+            .andExpect(jsonPath("$.base").value("dev"))
+            .andExpect(jsonPath("$.title").value("[SCRUM-1] Revert #290 bug"))
+            .andRespond(withSuccess(
+                "{\"number\":991,\"html_url\":\"https://gh/pull/991\",\"draft\":true}",
+                MediaType.APPLICATION_JSON));
+
+        DraftPullRequest revert = client.revert(pack(), change(), TARGET);
+
+        server.verify();
+        assertThat(revert.number()).isEqualTo(991L);
+        assertThat(revert.url()).isEqualTo(URI.create("https://gh/pull/991"));
+    }
+
+    /** A file the change added has no content to restore; putting it back means removing it. */
+    @Test
+    void revertDeletesAFileThatTheChangeAdded() {
+        server.expect(requestTo(REPO + "/commits/033f961b")).andExpect(method(HttpMethod.GET))
+            .andRespond(withSuccess(HEAD_COMMIT, MediaType.APPLICATION_JSON));
+        expectBaseRefLookup();
+        server.expect(requestTo(REPO + "/contents/" + SOURCE + "?ref=parent-sha"))
+            .andRespond(withResourceNotFound());
+
+        server.expect(requestTo(REPO + "/git/trees")).andExpect(method(HttpMethod.POST))
+            .andExpect(jsonPath("$.tree[0].path").value(SOURCE))
+            .andExpect(jsonPath("$.tree[0].sha").doesNotExist())
+            .andRespond(withSuccess("{\"sha\":\"revert-tree\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/git/commits")).andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{\"sha\":\"revert-commit\"}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/git/refs")).andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        server.expect(requestTo(REPO + "/pulls")).andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess(
+                "{\"number\":992,\"html_url\":\"https://gh/pull/992\",\"draft\":true}",
+                MediaType.APPLICATION_JSON));
+
+        assertThat(client.revert(pack(), change(), TARGET).number()).isEqualTo(992L);
+        server.verify();
+    }
+
+    private static final String HEAD_COMMIT = """
+        {"sha":"033f961b",
+         "parents":[{"sha":"parent-sha"}],
+         "files":[{"filename":"%s"}]}""".formatted(SOURCE);
+
+    private static RepositoryChange change() {
+        return new RepositoryChange("033f961b", "Merge pull request #290",
+            Instant.parse("2026-08-21T17:53:34Z"), "diff", 0,
+            new RepositoryChange.PullRequest(290, "bug",
+                URI.create("https://gh/pull/290"), Instant.parse("2026-08-21T17:53:34Z")),
+            null);
+    }
+
     private void givenPushEnabled(boolean pushEnabled) {
         RestClient.Builder builder = RestClient.builder();
         this.server = MockRestServiceServer.bindTo(builder).build();
@@ -211,9 +304,9 @@ class RestGitHubClientTest {
         return new EvidencePack(alert,
             new JiraTicket("SCRUM-1", URI.create("https://demo.atlassian.net/browse/SCRUM-1")),
             new LogEvidence(184, "NullPointerException", List.of("sample"), null),
-            new MetricEvidence(0.001, 0.4, false, null),
+            new MetricEvidence(0.001, 0.4, false, null, List.of()),
             new DeploymentEvidence("v1.4.2", "abc123", null,
                 Instant.parse("2026-08-14T02:04:00Z")),
-            "application_error", "evidence-sha");
+            null, "application_error", "evidence-sha");
     }
 }

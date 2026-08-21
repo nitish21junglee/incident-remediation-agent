@@ -3,6 +3,7 @@ package com.hackathon.incident_remediation_agent.ai;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -15,6 +16,8 @@ import org.springframework.web.client.RestClient;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
+import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
+import com.hackathon.incident_remediation_agent.evidence.SignalFxExport;
 
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -162,6 +165,78 @@ public class RestAiFixClient implements AiFixClient {
         return value == null || !value.isString() ? "" : value.asString();
     }
 
+    /**
+     * One line per SignalFlow program. The raw points stay in Mongo: hundreds of timestamped
+     * floats per series would outweigh the source files without telling the model anything the
+     * aggregates do not.
+     */
+    private static void appendPrograms(StringBuilder prompt, List<SignalFxExport> exports) {
+        if (exports == null || exports.isEmpty()) {
+            return;
+        }
+        prompt.append("\nSignalFx programs, aggregated either side of the trigger:\n");
+        for (SignalFxExport export : exports) {
+            prompt.append("- ").append(export.program())
+                .append(" [").append(export.filter()).append("]: ");
+            if (export.error() != null) {
+                prompt.append("unavailable, ").append(export.error()).append('\n');
+                continue;
+            }
+            prompt.append(export.pointCount()).append(" points")
+                .append("; before ").append(describe(export.before()))
+                .append("; during ").append(describe(export.during()))
+                .append('\n');
+        }
+    }
+
+    private static String describe(SignalFxExport.Aggregate aggregate) {
+        return "sum=%s mean=%s max=%s".formatted(
+            number(aggregate.sum()), number(aggregate.mean()), number(aggregate.max()));
+    }
+
+    /** Whole numbers read as counts; anything else is capped so a raw double cannot fill a line. */
+    private static String number(double value) {
+        if (!Double.isFinite(value)) {
+            return String.valueOf(value);
+        }
+        return value == Math.rint(value)
+            ? String.valueOf((long) value)
+            : String.format(Locale.ROOT, "%.3f", value);
+    }
+
+    /**
+     * The head commit diffed against its first parent, so the model sees what changed most
+     * recently rather than having to find the fault in a file that is mostly unchanged. The full
+     * files still follow, because the reply has to contain their complete new content.
+     */
+    private static void appendRecentChange(StringBuilder prompt, RepositoryChange change) {
+        if (change == null) {
+            return;
+        }
+        prompt.append("## Recent change\n\n");
+        prompt.append("This is the newest commit on the branch, diffed against the commit before "
+            + "it. Treat the earlier commit as the last known good state.\n\n");
+        prompt.append("Commit: ").append(change.commitSha()).append('\n');
+        if (change.commitMessage() != null) {
+            prompt.append("Message: ")
+                .append(change.commitMessage().lines().findFirst().orElse("")).append('\n');
+        }
+        prompt.append("Committed: ").append(change.committedAt()).append('\n');
+        RepositoryChange.PullRequest pull = change.lastPullRequest();
+        if (pull != null) {
+            prompt.append("Last merged pull request: #").append(pull.number()).append(' ')
+                .append(pull.title()).append(", merged ").append(pull.mergedAt()).append('\n');
+        }
+        if (change.truncatedFiles() > 0) {
+            prompt.append(change.truncatedFiles())
+                .append(" further changed file(s) omitted, the diff was too large\n");
+        }
+        if (change.diff() != null && !change.diff().isBlank()) {
+            prompt.append("\n```diff\n").append(change.diff()).append("\n```\n");
+        }
+        prompt.append('\n');
+    }
+
     private static String userPrompt(EvidencePack pack, Map<String, String> repositoryFiles) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("## Incident\n\n");
@@ -185,7 +260,9 @@ public class RestAiFixClient implements AiFixClient {
             prompt.append("## Metrics\n\n");
             prompt.append("Error rate before: ").append(pack.metrics().errorRateBefore()).append('\n');
             prompt.append("Error rate during: ").append(pack.metrics().errorRateDuring()).append('\n');
-            prompt.append("Latency changed: ").append(pack.metrics().latencyChanged()).append("\n\n");
+            prompt.append("Latency changed: ").append(pack.metrics().latencyChanged()).append('\n');
+            appendPrograms(prompt, pack.metrics().exports());
+            prompt.append('\n');
         }
 
         if (pack.deployment() != null && pack.deployment().version() != null) {
@@ -194,6 +271,8 @@ public class RestAiFixClient implements AiFixClient {
             prompt.append("Commit: ").append(pack.deployment().commitSha()).append('\n');
             prompt.append("Deployed at: ").append(pack.deployment().deployedAt()).append("\n\n");
         }
+
+        appendRecentChange(prompt, pack.change());
 
         prompt.append("## Files\n\n");
         List<String> paths = new ArrayList<>(repositoryFiles.keySet());

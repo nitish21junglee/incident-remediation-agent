@@ -20,6 +20,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
+import com.hackathon.incident_remediation_agent.evidence.SignalFxExport;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 
 /**
@@ -121,7 +122,8 @@ class SignalFlowSignalFxCollectorTest {
 
         collector().collect(alert("darsrftp-service", triggered));
 
-        assertThat(output).contains("SignalFx ERROR_COUNT response for reward-service: " + raw);
+        assertThat(output).contains(
+            "SignalFx ERROR_COUNT response for filter('service.name', 'reward-service'): " + raw);
     }
 
     /** A bare name should still match; PagerDuty rarely carries the "-service" suffix. */
@@ -166,8 +168,78 @@ class SignalFlowSignalFxCollectorTest {
             .query(any(SignalFxProgram.class), any(), any(), any());
     }
 
+    @Test
+    void runsEveryProgramAndExportsEachOne() {
+        Instant triggered = Instant.now().minus(Duration.ofMinutes(10));
+        stub(SignalFxProgram.ERROR_COUNT, counts(triggered, 1, 40));
+        stub(SignalFxProgram.REQUEST_COUNT, counts(triggered, 100, 100));
+        stub(SignalFxProgram.LATENCY_BY_URI, "[]");
+        stubByNamespace(SignalFxProgram.CPU_UTILIZATION, counts(triggered, 12, 74));
+        stubByNamespace(SignalFxProgram.MEMORY_UTILIZATION, counts(triggered, 40, 41));
+
+        MetricEvidence metrics = collector().collect(alert("reward-service", triggered));
+
+        assertThat(metrics.exports()).extracting(SignalFxExport::program).containsExactly(
+            "ERROR_COUNT", "REQUEST_COUNT", "LATENCY_BY_URI",
+            "CPU_UTILIZATION", "MEMORY_UTILIZATION");
+        // Container metrics carry no service.name, so they are scoped by namespace instead.
+        assertThat(metrics.exports()).filteredOn(e -> e.program().equals("CPU_UTILIZATION"))
+            .singleElement()
+            .satisfies(cpu -> {
+                assertThat(cpu.filter()).isEqualTo("filter('k8s.namespace.name', 'darsrftp-service-dev')");
+                assertThat(cpu.before().max()).isEqualTo(12.0);
+                assertThat(cpu.during().max()).isEqualTo(74.0);
+            });
+        verify(this.client).queryByK8sNamespace(
+            eq(SignalFxProgram.MEMORY_UTILIZATION), eq(SignalFxService.REWARD), any(), any());
+    }
+
+    /** The raw points go to Mongo, so they have to survive collection verbatim. */
+    @Test
+    void keepsTheRawPointsOnTheExport() {
+        Instant triggered = Instant.now().minus(Duration.ofMinutes(10));
+        String raw = counts(triggered, 1, 40);
+        stub(SignalFxProgram.ERROR_COUNT, raw);
+        stub(SignalFxProgram.REQUEST_COUNT, "[]");
+        stub(SignalFxProgram.LATENCY_BY_URI, "[]");
+        stubByNamespace(SignalFxProgram.CPU_UTILIZATION, "[]");
+        stubByNamespace(SignalFxProgram.MEMORY_UTILIZATION, "[]");
+
+        MetricEvidence metrics = collector().collect(alert("reward-service", triggered));
+
+        assertThat(metrics.exports().get(0).rawPoints()).isEqualTo(raw);
+        assertThat(metrics.exports().get(0).pointCount()).isEqualTo(2);
+    }
+
+    /**
+     * The namespace is a second guess at what the service is called, so these are the programs
+     * most likely to fail. Losing them must not cost the error rate already collected.
+     */
+    @Test
+    void keepsTheErrorRateWhenAContainerProgramFails() {
+        Instant triggered = Instant.now().minus(Duration.ofMinutes(10));
+        stub(SignalFxProgram.ERROR_COUNT, counts(triggered, 1, 40));
+        stub(SignalFxProgram.REQUEST_COUNT, counts(triggered, 100, 100));
+        stub(SignalFxProgram.LATENCY_BY_URI, "[]");
+        when(this.client.queryByK8sNamespace(any(SignalFxProgram.class), any(), any(), any()))
+            .thenThrow(new SignalFxQueryException("SignalFlow API returned status 404"));
+
+        MetricEvidence metrics = collector().collect(alert("reward-service", triggered));
+
+        assertThat(metrics.errorRateDuring()).isEqualTo(0.40);
+        assertThat(metrics.exports()).hasSize(5);
+        assertThat(metrics.exports())
+            .filteredOn(e -> e.program().equals("CPU_UTILIZATION"))
+            .singleElement()
+            .satisfies(cpu -> assertThat(cpu.error()).contains("404"));
+    }
+
     private void stub(SignalFxProgram program, String json) {
         when(this.client.query(eq(program), any(), any(), any())).thenReturn(json);
+    }
+
+    private void stubByNamespace(SignalFxProgram program, String json) {
+        when(this.client.queryByK8sNamespace(eq(program), any(), any(), any())).thenReturn(json);
     }
 
     private static String counts(Instant triggered, double before, double during) {

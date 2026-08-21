@@ -55,8 +55,13 @@ public class HttpSplunkCollector implements SplunkCollector {
     /** Samples are quoted verbatim into a Jira comment and an AI prompt, so the list is bounded. */
     private static final int MAX_SAMPLED_EVENTS = 10;
 
-    /** Bound on the raw body echoed into the log, so a large response cannot flood it. */
-    private static final int MAX_LOGGED_BODY_CHARACTERS = 4_000;
+    /**
+     * Bound on an error body echoed into the log. A provider's failure page can be a whole HTML
+     * document, and the first few lines of it say everything the first few thousand do. A
+     * successful body is logged in full instead: it is the evidence the rest of the run is built
+     * on, and reading half of it answers nothing.
+     */
+    private static final int MAX_LOGGED_ERROR_CHARACTERS = 4_000;
 
     private static final LogEvidence NO_LOGS = new LogEvidence(0, null, List.of(), null);
 
@@ -88,7 +93,8 @@ public class HttpSplunkCollector implements SplunkCollector {
         try {
             String body = this.restClient.get().uri(LOGS_PATH).retrieve().body(String.class);
             log.info("Log endpoint {} returned {} characters for incident {}: {}", LOGS_PATH,
-                body == null ? 0 : body.length(), alert.incidentId(), truncate(body));
+                body == null ? 0 : body.length(), alert.incidentId(),
+                body == null ? "<none>" : body);
             return body == null || body.isBlank() ? null : this.objectMapper.readTree(body);
         }
         catch (RestClientException | JacksonException exception) {
@@ -112,9 +118,9 @@ public class HttpSplunkCollector implements SplunkCollector {
         if (body == null) {
             return "<none>";
         }
-        return body.length() <= MAX_LOGGED_BODY_CHARACTERS
+        return body.length() <= MAX_LOGGED_ERROR_CHARACTERS
             ? body
-            : body.substring(0, MAX_LOGGED_BODY_CHARACTERS) + "... (" + body.length() + " total)";
+            : body.substring(0, MAX_LOGGED_ERROR_CHARACTERS) + "... (" + body.length() + " total)";
     }
 
     private static List<JsonNode> errorEvents(JsonNode events) {

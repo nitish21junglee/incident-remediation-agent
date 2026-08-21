@@ -113,7 +113,7 @@ class EvidenceClassifierTest {
     }
 
     private static MetricEvidence metrics(double before, double during, boolean latencyChanged) {
-        return new MetricEvidence(before, during, latencyChanged, null);
+        return new MetricEvidence(before, during, latencyChanged, null, List.of());
     }
 
     private static DeploymentEvidence deployedAt(Instant when) {

@@ -8,6 +8,7 @@ import java.util.HexFormat;
 import org.springframework.stereotype.Service;
 
 import com.hackathon.incident_remediation_agent.evidence.signalfx.SignalFxCollector;
+import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 
@@ -32,13 +33,18 @@ public class EvidenceCollectionService {
     private final SplunkCollector splunk;
     private final SignalFxCollector signalfx;
     private final DeploymentCollector deployments;
+    private final GitHubChangeCollector changes;
+    private final RepositoryResolver repositories;
     private final EvidenceClassifier classifier;
 
     EvidenceCollectionService(SplunkCollector splunk, SignalFxCollector signalfx,
-        DeploymentCollector deployments, EvidenceClassifier classifier) {
+        DeploymentCollector deployments, GitHubChangeCollector changes,
+        RepositoryResolver repositories, EvidenceClassifier classifier) {
         this.splunk = splunk;
         this.signalfx = signalfx;
         this.deployments = deployments;
+        this.changes = changes;
+        this.repositories = repositories;
         this.classifier = classifier;
     }
 
@@ -48,8 +54,17 @@ public class EvidenceCollectionService {
         DeploymentEvidence deployment = this.deployments.collect(alert);
         String classification = this.classifier.classify(alert, logs, metrics, deployment);
 
-        return new EvidencePack(alert, ticket, logs, metrics, deployment, classification,
-            version(alert, logs, metrics, deployment, classification));
+        return new EvidencePack(alert, ticket, logs, metrics, deployment, change(alert),
+            classification, version(alert, logs, metrics, deployment, classification));
+    }
+
+    /**
+     * The repository is resolved from the alert's service here rather than waiting for the AI
+     * router, so the last merged pull request is recorded for every incident, including the ones
+     * that never reach a model.
+     */
+    private RepositoryChange change(IncidentAlert alert) {
+        return this.repositories.resolve(alert).map(this.changes::collect).orElse(null);
     }
 
     private static String version(IncidentAlert alert, LogEvidence logs, MetricEvidence metrics,
