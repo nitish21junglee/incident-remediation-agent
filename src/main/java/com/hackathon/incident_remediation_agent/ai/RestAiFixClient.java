@@ -19,8 +19,10 @@ import com.hackathon.incident_remediation_agent.evidence.EvidencePack;
 import com.hackathon.incident_remediation_agent.evidence.RepositoryChange;
 import com.hackathon.incident_remediation_agent.evidence.SignalFxExport;
 
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Asks an OpenAI-compatible model for a hypothesis and the full content of the files it would
@@ -64,7 +66,10 @@ public class RestAiFixClient implements AiFixClient {
         unrelated code.
         """;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /** Trailing tokens are ignored: the reply is the first value, the rest is prose. */
+    private final ObjectMapper objectMapper = JsonMapper.builder()
+        .disable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+        .build();
     private final RestClient restClient;
     private final AiModelSelector models;
 
@@ -125,7 +130,10 @@ public class RestAiFixClient implements AiFixClient {
     }
 
     private FixProposal parse(String content) {
-        JsonNode root = this.objectMapper.readTree(stripFences(content));
+        JsonNode root = this.objectMapper.readTree(stripOpeningFence(content));
+        if (!root.isObject()) {
+            throw new IllegalStateException("Model reply held no JSON object");
+        }
 
         JsonNode probableFix = root.get("probableFix");
         if (probableFix == null || !probableFix.asBoolean()) {
@@ -146,18 +154,19 @@ public class RestAiFixClient implements AiFixClient {
             Map.copyOf(files));
     }
 
-    /** Models often wrap JSON in a fenced block despite being asked for JSON only. */
-    private static String stripFences(String content) {
+    /**
+     * Models often wrap JSON in a fenced block despite being asked for JSON only. Only the opening
+     * fence has to go: the closing one, and any explanation the model adds after it, are trailing
+     * tokens the parser ignores. Searching for the closing fence instead picks the wrong one as
+     * soon as the explanation contains a fenced block of its own.
+     */
+    private static String stripOpeningFence(String content) {
         String trimmed = content.trim();
         if (!trimmed.startsWith("```")) {
             return trimmed;
         }
         int firstNewline = trimmed.indexOf('\n');
-        int lastFence = trimmed.lastIndexOf("```");
-        if (firstNewline < 0 || lastFence <= firstNewline) {
-            return trimmed;
-        }
-        return trimmed.substring(firstNewline + 1, lastFence).trim();
+        return firstNewline < 0 ? trimmed : trimmed.substring(firstNewline + 1);
     }
 
     private static String text(JsonNode root, String field) {
