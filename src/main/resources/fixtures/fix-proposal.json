@@ -1,0 +1,5 @@
+{
+  "probableFix": true,
+  "hypothesis": "Fixture proposal: the incident evidence was not sent to a model. Set agent.mode=live to have a model read the evidence and the repository files.",
+  "summary": "Fixture change from the incident agent"
+}

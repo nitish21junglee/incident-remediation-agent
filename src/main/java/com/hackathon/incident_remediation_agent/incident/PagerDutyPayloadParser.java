@@ -28,8 +28,18 @@ public class PagerDutyPayloadParser {
             required(payload, "/event/data/id"),
             required(payload, "/event/data/title"),
             required(payload, "/event/data/service/id"),
+            // The service name drives the observability queries and points at the owning
+            // repository. Optional, because a sparse payload should still be accepted.
+            optional(payload, "/event/data/service/summary")
+                .orElseGet(() -> required(payload, "/event/data/service/id")),
             Instant.parse(required(payload, "/event/occurred_at")),
             URI.create(required(payload, "/event/data/html_url")));
+    }
+
+    private static java.util.Optional<String> optional(JsonNode payload, String pointer) {
+        JsonNode node = payload.at(pointer);
+        String value = node.isMissingNode() || node.isNull() ? "" : node.asString();
+        return value.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(value);
     }
 
     private static String required(JsonNode payload, String pointer) {

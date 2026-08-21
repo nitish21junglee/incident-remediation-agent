@@ -1,0 +1,11 @@
+{
+  "errorCount": 184,
+  "topError": "[FIXTURE] java.lang.NullPointerException: Cannot invoke \"String.trim()\" because the return value of \"RewardEvent.getPayload()\" is null",
+  "samples": [
+    "java.lang.NullPointerException: Cannot invoke \"String.trim()\" because the return value of \"RewardEvent.getPayload()\" is null",
+    "\tat com.flutter.reward_service.service.KafkaConsumer.consumeRewardEvent(KafkaConsumer.java:142)",
+    "\tat org.springframework.kafka.listener.KafkaMessageListenerContainer.doInvokeRecordListener(KafkaMessageListenerContainer.java:2789)",
+    "\tat java.base/java.lang.Thread.run(Thread.java:1583)"
+  ],
+  "sourceUrl": null
+}
