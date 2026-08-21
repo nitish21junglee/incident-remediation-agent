@@ -821,6 +821,41 @@ body::before {
   background: var(--purple-light);
 }
 
+.export-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.export-table th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-hover);
+  white-space: nowrap;
+}
+
+.export-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-light);
+  color: var(--text);
+}
+
+.export-table tr:last-child td {
+  border-bottom: none;
+}
+
+.export-filter {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
 /* ── Loading / empty ── */
 .loading {
   text-align: center;

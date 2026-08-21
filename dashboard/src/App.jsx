@@ -605,6 +605,42 @@ function DetailModal({ incident, onClose }) {
           )}
         </div>
 
+        {incident.signalFxExports?.exports?.length > 0 && (
+          <div className="detail-section">
+            <h3>SignalFx Programs</h3>
+            <div className="table-wrap">
+              <table className="export-table">
+                <thead>
+                  <tr>
+                    <th>Program</th>
+                    <th>Filter</th>
+                    <th>Points</th>
+                    <th>Before (sum / mean / max)</th>
+                    <th>During (sum / mean / max)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {incident.signalFxExports.exports.map(exp => (
+                    <tr key={exp.program}>
+                      <td>{exp.program}</td>
+                      <td className="export-filter">{exp.filter}</td>
+                      <td>{exp.pointCount}</td>
+                      {exp.error ? (
+                        <td colSpan={2} style={{ color: 'var(--text-muted)' }}>{exp.error}</td>
+                      ) : (
+                        <>
+                          <td>{exp.before.sum.toFixed(2)} / {exp.before.mean.toFixed(2)} / {exp.before.max.toFixed(2)}</td>
+                          <td>{exp.during.sum.toFixed(2)} / {exp.during.mean.toFixed(2)} / {exp.during.max.toFixed(2)}</td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {incident.splunkLogs && (
           <div className="detail-section">
             <h3>Splunk Logs</h3>
@@ -781,6 +817,17 @@ export default function App() {
     fetchData()
   }
 
+  const handleSelect = useCallback(async (inc) => {
+    setSelected(inc)
+    if (!live) return
+    try {
+      const res = await fetch(`/api/dashboard/incidents/${encodeURIComponent(inc.incidentId)}`)
+      if (res.ok) setSelected(await res.json())
+    } catch {
+      // keep showing the row's (rawPoints-trimmed) data
+    }
+  }, [live])
+
   if (loading) {
     return (
       <div className="dashboard">
@@ -810,7 +857,7 @@ export default function App() {
       <StatsCards stats={stats} />
 
       <div className="content-grid">
-        <IncidentsTable incidents={incidents} onSelect={setSelected} />
+        <IncidentsTable incidents={incidents} onSelect={handleSelect} />
         <Timeline incidents={incidents} />
       </div>
 
