@@ -469,6 +469,42 @@ body::before {
   text-decoration: underline;
 }
 
+.pr-links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+
+.pr-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 11px;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.pr-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.pr-link.fix {
+  color: var(--purple);
+  background: var(--purple-light);
+  border: 1px solid var(--purple-border);
+}
+
+.pr-link.revert {
+  color: var(--red);
+  background: var(--red-light);
+  border: 1px solid var(--red-border);
+}
+
 /* ── Status badges ── */
 .status-badge {
   display: inline-flex;

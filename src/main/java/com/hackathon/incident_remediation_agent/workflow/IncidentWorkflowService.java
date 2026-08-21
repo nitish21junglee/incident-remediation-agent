@@ -197,7 +197,9 @@ public class IncidentWorkflowService implements IncidentWorkflow {
             WorkflowStage finalStatus =
                 submission.pushed() ? WorkflowStage.DRAFT_PR_CREATED : WorkflowStage.COMPLETED;
             this.incidentDocuments.update(alert.incidentId(),
-                current -> current.aiOutput(routed.proposal()).status(finalStatus));
+                current -> current.aiOutput(routed.proposal())
+                    .fixPullRequest(submission.pullRequest())
+                    .status(finalStatus));
 
             if (submission.pushed()) {
                 this.store.update(alert.incidentId(),

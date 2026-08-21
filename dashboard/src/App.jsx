@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import './index.css'
 
+// The row-hover particle/confetti/firework effects below fire a burst of emoji on every incident
+// status. Off by default — flip to true to bring them back.
+const SCREEN_EFFECTS_ENABLED = false
+
 const STAGES = [
   'RECEIVED', 'JIRA_CREATED', 'COLLECTING_CONTEXT', 'JIRA_CONTEXT_PUBLISHED',
   'AI_INVESTIGATING', 'VALIDATING', 'DRAFT_PR_CREATED', 'COMPLETED', 'FAILED', 'AI_SKIPPED'
@@ -408,12 +412,36 @@ function ScreenEffects({ type, origin }) {
   )
 }
 
+function PullRequestLinks({ incident }) {
+  const { fixPullRequest, revertPullRequest } = incident
+  if (!fixPullRequest && !revertPullRequest) {
+    return <span style={{ color: 'var(--text-muted)' }}>-</span>
+  }
+  return (
+    <div className="pr-links">
+      {fixPullRequest && (
+        <a className="pr-link fix" href={fixPullRequest.url} target="_blank" rel="noreferrer"
+           onClick={e => e.stopPropagation()}>
+          Fix #{fixPullRequest.number}
+        </a>
+      )}
+      {revertPullRequest && (
+        <a className="pr-link revert" href={revertPullRequest.url} target="_blank" rel="noreferrer"
+           onClick={e => e.stopPropagation()}>
+          Revert #{revertPullRequest.number}
+        </a>
+      )}
+    </div>
+  )
+}
+
 function IncidentsTable({ incidents, onSelect }) {
   const [effectType, setEffectType] = useState(null)
   const [effectOrigin, setEffectOrigin] = useState({ x: 0, y: 0 })
   const activeRow = useRef(null)
 
   const handleRowHover = (e, inc) => {
+    if (!SCREEN_EFFECTS_ENABLED) return
     if (activeRow.current === inc.incidentId) return
     activeRow.current = inc.incidentId
 
@@ -438,7 +466,7 @@ function IncidentsTable({ incidents, onSelect }) {
 
   return (
     <div className="table-section">
-      <ScreenEffects type={effectType} origin={effectOrigin} />
+      {SCREEN_EFFECTS_ENABLED && <ScreenEffects type={effectType} origin={effectOrigin} />}
       <div className="table-header">
         <h2>Incidents</h2>
         <span className="count-badge">{incidents.length}</span>
@@ -450,6 +478,7 @@ function IncidentsTable({ incidents, onSelect }) {
               <th>Incident</th>
               <th>Jira</th>
               <th>Status</th>
+              <th>Pull Requests</th>
               <th>Error Rate (Before/During)</th>
               <th>Latency</th>
               <th>Time</th>
@@ -457,7 +486,7 @@ function IncidentsTable({ incidents, onSelect }) {
           </thead>
           <tbody>
             {incidents.length === 0 && (
-              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No incidents yet</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No incidents yet</td></tr>
             )}
             {incidents.map(inc => (
               <tr
@@ -485,6 +514,7 @@ function IncidentsTable({ incidents, onSelect }) {
                     {STAGE_LABELS[inc.status] || inc.status}
                   </span>
                 </td>
+                <td><PullRequestLinks incident={inc} /></td>
                 <td><ErrorRateCell signalFxExports={inc.signalFxExports} /></td>
                 <td>
                   {inc.signalFxExports ? (
@@ -576,6 +606,24 @@ function DetailModal({ incident, onClose }) {
           <span className="detail-label">Timestamp</span>
           <span className="detail-value">{formatTime(incident.timestamp)}</span>
 
+          <span className="detail-label">Fix PR</span>
+          <span className="detail-value">
+            {incident.fixPullRequest ? (
+              <a className="pr-link fix" href={incident.fixPullRequest.url} target="_blank" rel="noreferrer">
+                #{incident.fixPullRequest.number}
+              </a>
+            ) : '-'}
+          </span>
+
+          <span className="detail-label">Revert PR</span>
+          <span className="detail-value">
+            {incident.revertPullRequest ? (
+              <a className="pr-link revert" href={incident.revertPullRequest.url} target="_blank" rel="noreferrer">
+                #{incident.revertPullRequest.number}
+              </a>
+            ) : '-'}
+          </span>
+
           {incident.signalFxExports && (
             <>
               <span className="detail-label">Error Before</span>
@@ -653,6 +701,8 @@ const MOCK_INCIDENTS = [
     jiraUrl: "https://jungleegames.atlassian.net/browse/HACK-42",
     status: "COMPLETED",
     timestamp: new Date(Date.now() - 3600000).toISOString(),
+    fixPullRequest: { number: 128, url: "https://github.com/jungleegames/reward-service/pull/128" },
+    revertPullRequest: { number: 127, url: "https://github.com/jungleegames/reward-service/pull/127" },
     signalFxExports: { errorRateBefore: 0.5, errorRateDuring: 12.3, latencyChanged: true, dashboardUrl: "https://app.eu0.signalfx.com/#/dashboard/demo" },
     splunkLogs: { errorCount: 47, topError: "java.lang.NullPointerException: Cannot invoke method on null reference", samples: [
       "2026-08-22 10:14:02 ERROR [reward-service] c.f.r.DatabaseConnectionPool - Connection pool exhausted, max=10 active=10 idle=0",
@@ -680,6 +730,8 @@ const MOCK_INCIDENTS = [
     jiraUrl: "https://jungleegames.atlassian.net/browse/HACK-44",
     status: "DRAFT_PR_CREATED",
     timestamp: new Date(Date.now() - 2400000).toISOString(),
+    fixPullRequest: { number: 131, url: "https://github.com/jungleegames/reward-service/pull/131" },
+    revertPullRequest: { number: 129, url: "https://github.com/jungleegames/reward-service/pull/129" },
     signalFxExports: { errorRateBefore: 2.1, errorRateDuring: 15.6, latencyChanged: true, dashboardUrl: "https://app.eu0.signalfx.com/#/dashboard/demo" },
     splunkLogs: { errorCount: 112, topError: "com.flutter.reward_service.exceptions.PaymentTimeoutException", samples: [
       "2026-08-22 10:55:12 ERROR [reward-service] c.f.r.PaymentGateway - Payment API timeout after 5000ms",
