@@ -133,6 +133,7 @@ class RestJiraClientTest {
         return new AgentProperties(
             "fixture",
             "PDEMO",
+            null,
             new AgentProperties.Jira(baseUrl, "demo@example.com", "fixture-token", "HACK", "Task"),
             null,
             null,

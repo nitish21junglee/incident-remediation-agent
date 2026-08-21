@@ -1,0 +1,22 @@
+{
+  "type": "event_callback",
+  "event": {
+    "type": "message",
+    "channel": "C_INCIDENTS",
+    "client_msg_id": "slack-msg-001",
+    "ts": "1723601640.000100",
+    "text": "Triggered: demo-api error rate increased\nhttps://example.pagerduty.com/incidents/PSLACK001",
+    "attachments": [
+      {
+        "title": "demo-api error rate increased",
+        "fallback": "demo-api error rate increased",
+        "fields": [
+          {
+            "title": "Service",
+            "value": "demo-api"
+          }
+        ]
+      }
+    ]
+  }
+}
