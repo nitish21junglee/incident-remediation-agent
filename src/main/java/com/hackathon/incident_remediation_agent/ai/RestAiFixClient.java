@@ -42,6 +42,9 @@ public class RestAiFixClient implements AiFixClient {
 
     private static final Logger log = LoggerFactory.getLogger(RestAiFixClient.class);
 
+    /** Kept from each end of a failed reply. Enough to see its shape, short enough for one line. */
+    private static final int PREVIEW_CHARS = 300;
+
     private static final String SYSTEM_PROMPT = """
         You are an on-call engineer triaging a production incident.
 
@@ -89,17 +92,38 @@ public class RestAiFixClient implements AiFixClient {
         RuntimeException lastFailure = null;
 
         for (String model : candidates) {
+            String reply = null;
             try {
-                return parse(complete(model, prompt));
+                reply = complete(model, prompt);
+                return parse(reply);
             }
             catch (RuntimeException exception) {
                 log.warn("Model {} failed to produce a fix proposal for {}; trying the next "
-                    + "candidate", model, pack.ticket().key(), exception);
+                    + "candidate. Reply: {}", model, pack.ticket().key(), preview(reply), exception);
                 lastFailure = exception;
             }
         }
         throw new IllegalStateException(
             "Every candidate model failed for " + pack.ticket().key(), lastFailure);
+    }
+
+    /**
+     * Both ends of the reply, whitespace collapsed onto one line. A stack trace says the reply was
+     * malformed but never how, and by the time the warning is read the reply is gone: it is the
+     * fence at the start and the prose at the end that show what the model actually did. Bounded
+     * because a reply carries whole source files.
+     */
+    private static String preview(String reply) {
+        if (reply == null) {
+            return "none, the call itself failed";
+        }
+        String collapsed = reply.strip().replaceAll("\\s+", " ");
+        if (collapsed.length() <= 2 * PREVIEW_CHARS) {
+            return collapsed;
+        }
+        return collapsed.substring(0, PREVIEW_CHARS)
+            + " ...[" + collapsed.length() + " chars]... "
+            + collapsed.substring(collapsed.length() - PREVIEW_CHARS);
     }
 
     private String complete(String model, String prompt) {

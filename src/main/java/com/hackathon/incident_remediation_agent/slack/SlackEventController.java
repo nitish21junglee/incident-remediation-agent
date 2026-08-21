@@ -64,6 +64,8 @@ public class SlackEventController {
 
     @PostMapping("/slack/events")
     ResponseEntity<Object> receive(@RequestBody JsonNode payload) {
+        log.info("Incoming /slack/events request: {}", payload);
+
         String type = payload.path("type").asString();
 
         if ("url_verification".equals(type)) {

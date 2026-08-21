@@ -1,6 +1,7 @@
 package com.hackathon.incident_remediation_agent.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -10,8 +11,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -25,6 +28,9 @@ import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
 import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 import com.hackathon.incident_remediation_agent.jira.JiraTicket;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -47,8 +53,14 @@ class RestAiFixClientTest {
 
     private RestAiFixClient client;
 
+    private ListAppender<ILoggingEvent> warnings;
+
     @BeforeEach
     void setUp() {
+        this.warnings = new ListAppender<>();
+        this.warnings.start();
+        ((Logger) LoggerFactory.getLogger(RestAiFixClient.class)).addAppender(this.warnings);
+
         RestClient.Builder builder = RestClient.builder();
         this.server = MockRestServiceServer.bindTo(builder).build();
         AgentProperties properties = new AgentProperties("live", "P2UX5VH", null, null, null, null,
@@ -87,6 +99,34 @@ class RestAiFixClientTest {
         this.server.verify();
         assertThat(proposal.probableFix()).isTrue();
         assertThat(proposal.files()).containsEntry(SOURCE, FIXED);
+    }
+
+    @AfterEach
+    void tearDown() {
+        ((Logger) LoggerFactory.getLogger(RestAiFixClient.class)).detachAppender(this.warnings);
+    }
+
+    /**
+     * The reply is gone by the time anyone reads the warning, and a stack trace says only that it
+     * was malformed. Both ends of it have to be in the log, and none of the middle.
+     */
+    @Test
+    void logsBothEndsOfAReplyItCouldNotParse() {
+        String padding = "x".repeat(700);
+        expectCompletion("I could not find the fault. " + padding + " Ask me again with more logs.");
+
+        assertThatExceptionOfType(IllegalStateException.class)
+            .isThrownBy(() -> this.client.propose(pack(), Map.of(SOURCE, "class Mapper {}")));
+
+        assertThat(this.warnings.list).singleElement().satisfies(event -> {
+            assertThat(event.getFormattedMessage())
+                .contains("I could not find the fault.")
+                .contains("Ask me again with more logs.")
+                .contains("chars]")
+                .doesNotContain(padding);
+            assertThat(event.getThrowableProxy().getClassName())
+                .isEqualTo("tools.jackson.core.exc.StreamReadException");
+        });
     }
 
     private void expectCompletion(String content) {
