@@ -14,11 +14,11 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 
 /**
  * Finds the repository that owns a failing service, in two configured hops: the PagerDuty service
- * id selects a short repository name, and that name selects the checkout directory and validation
- * command.
+ * id selects a short repository name, and that name selects the GitHub slug, base branch and the
+ * files that may be read and rewritten.
  *
- * <p>The name-to-directory map is an allowlist. A repository absent from it can never be cloned,
- * patched or pushed, whatever the incident text, log samples or model output happen to say. That
+ * <p>The name-to-target map is an allowlist. A repository absent from it can never be read or
+ * written, whatever the incident text, log samples or model output happen to say. That
  * matters because those are all untrusted input: without the allowlist, whoever can write a log
  * line could steer the agent at another repository.
  *
@@ -94,9 +94,6 @@ public class RepositoryResolver {
     private static String incompleteReason(AgentProperties.RepositoryTarget target) {
         if (isBlank(target.slug())) {
             return "no GitHub slug";
-        }
-        if (isBlank(target.directory())) {
-            return "no checkout directory";
         }
         if (target.contextFiles() == null || target.contextFiles().isEmpty()) {
             return "no context files";

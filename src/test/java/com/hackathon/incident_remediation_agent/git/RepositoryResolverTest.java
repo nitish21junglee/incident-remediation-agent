@@ -19,8 +19,8 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 class RepositoryResolverTest {
 
     private static final AgentProperties.RepositoryTarget DEMO =
-        new AgentProperties.RepositoryTarget("acme/demo-api", "main", "/tmp/demo-api",
-            List.of("src/main/java/Mapper.java"), List.of("./mvnw", "test"));
+        new AgentProperties.RepositoryTarget("acme/demo-api", "dev",
+            List.of("src/main/java/Mapper.java"));
 
     private static final Map<String, AgentProperties.RepositoryTarget> KNOWN =
         Map.of("demo-api", DEMO);
@@ -55,17 +55,8 @@ class RepositoryResolverTest {
     @Test
     void rejectsTargetsMissingARepositorySlug() {
         RepositoryResolver resolver = resolver(Map.of("demo-api",
-            new AgentProperties.RepositoryTarget("  ", "main", "/tmp/demo-api",
-                List.of("f.java"), List.of("true"))), Map.of("PDEMO", "demo-api"));
-
-        assertThat(resolver.resolve(alert("PDEMO"))).isEmpty();
-    }
-
-    @Test
-    void rejectsTargetsMissingALocalPath() {
-        RepositoryResolver resolver = resolver(Map.of("demo-api",
-            new AgentProperties.RepositoryTarget("acme/demo-api", "main", null,
-                List.of("f.java"), List.of("true"))), Map.of("PDEMO", "demo-api"));
+            new AgentProperties.RepositoryTarget("  ", "dev",
+                List.of("f.java"))), Map.of("PDEMO", "demo-api"));
 
         assertThat(resolver.resolve(alert("PDEMO"))).isEmpty();
     }
@@ -73,8 +64,8 @@ class RepositoryResolverTest {
     @Test
     void rejectsTargetsWithNoContextFiles() {
         RepositoryResolver resolver = resolver(Map.of("demo-api",
-            new AgentProperties.RepositoryTarget("acme/demo-api", "main", "/tmp/demo-api",
-                List.of(), List.of("true"))), Map.of("PDEMO", "demo-api"));
+            new AgentProperties.RepositoryTarget("acme/demo-api", "dev",
+                List.of())), Map.of("PDEMO", "demo-api"));
 
         assertThat(resolver.resolve(alert("PDEMO"))).isEmpty();
     }
@@ -96,7 +87,7 @@ class RepositoryResolverTest {
         return new RepositoryResolver(new AgentProperties(
             "fixture", "PDEMO", null, null, null, null, null,
             new AgentProperties.GitHub("https://api.github.com", "token",
-                "hackathon/incident", List.of(".github/workflows/"),
+                "agent/incident", false, 5, List.of(".github/workflows/"),
                 repositories, serviceRepositories)));
     }
 

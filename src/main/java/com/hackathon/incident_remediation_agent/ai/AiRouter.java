@@ -1,6 +1,5 @@
 package com.hackathon.incident_remediation_agent.ai;
 
-import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -18,8 +17,8 @@ import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
  * Returns empty when the evidence does not support a bounded code change.
  *
  * <p>Routing is deterministic and happens before any model call, so an ineligible incident costs
- * nothing and leaks no repository content. This class never creates a workspace, runs a command, or
- * calls GitHub.
+ * nothing and leaks no repository content: the repository read only happens once the evidence has
+ * already justified it. This class never writes anything — no branch, no commit, no pull request.
  */
 @Component
 public class AiRouter {
@@ -30,11 +29,11 @@ public class AiRouter {
 
     private final AiFixClient aiFixClient;
     private final AiRepositorySelector repositorySelector;
-    private final RepositoryContextReader contextReader;
+    private final GitHubContextReader contextReader;
     private final RepositoryResolver repositories;
 
     AiRouter(AiFixClient aiFixClient, AiRepositorySelector repositorySelector,
-             RepositoryContextReader contextReader, RepositoryResolver repositories) {
+             GitHubContextReader contextReader, RepositoryResolver repositories) {
         this.aiFixClient = aiFixClient;
         this.repositorySelector = repositorySelector;
         this.contextReader = contextReader;
@@ -70,19 +69,20 @@ public class AiRouter {
         }
         AgentProperties.RepositoryTarget target = resolved.get();
 
-        Map<String, String> repositoryFiles = this.contextReader.read(
-            Path.of(target.directory()), target.contextFiles());
+        Map<String, String> repositoryFiles =
+            this.contextReader.read(target, target.contextFiles());
 
         FixProposal proposal = this.aiFixClient.propose(pack, repositoryFiles);
         if (proposal == null || !proposal.probableFix()) {
             log.info("Model reported no probable fix for {}", pack.ticket().key());
             return Optional.empty();
         }
-        if (isBlank(proposal.unifiedDiff())) {
-            log.info("Model returned a probable fix with no diff for {}", pack.ticket().key());
+        if (proposal.files() == null || proposal.files().isEmpty()) {
+            log.info("Model returned a probable fix with no file changes for {}",
+                pack.ticket().key());
             return Optional.empty();
         }
-        return Optional.of(new RoutedFix(chosen.get(), proposal));
+        return Optional.of(new RoutedFix(chosen.get(), proposal, repositoryFiles));
     }
 
     /**

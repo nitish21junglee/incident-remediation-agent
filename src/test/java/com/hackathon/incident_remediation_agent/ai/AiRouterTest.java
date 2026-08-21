@@ -1,6 +1,7 @@
 package com.hackathon.incident_remediation_agent.ai;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.Mockito.mock;
@@ -8,10 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +18,6 @@ import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.DeploymentEvidence;
@@ -35,23 +32,26 @@ class AiRouterTest {
 
     private static final String CONTEXT_FILE = "src/main/java/Mapper.java";
 
-    private static final FixProposal PROPOSAL = new FixProposal(
-        true, "null payment type", "Handle missing payment type", "diff --git a/x b/x\n");
+    private static final String CONTEXT_CONTENT = "class Mapper {}";
 
-    @TempDir
-    Path repository;
+    private static final FixProposal PROPOSAL = new FixProposal(
+        true, "null payment type", "Handle missing payment type",
+        Map.of(CONTEXT_FILE, "class Mapper { /* guarded */ }"));
 
     private AiFixClient aiFixClient;
+
+    private GitHubContextReader contextReader;
 
     private AiRepositorySelector repositorySelector;
 
     private AiRouter router;
 
     @BeforeEach
-    void setUp() throws IOException {
-        Files.createDirectories(repository.resolve("src/main/java"));
-        Files.writeString(repository.resolve(CONTEXT_FILE), "class Mapper {}");
+    void setUp() {
         this.aiFixClient = mock(AiFixClient.class);
+        this.contextReader = mock(GitHubContextReader.class);
+        when(this.contextReader.read(any(), any()))
+            .thenReturn(Map.of(CONTEXT_FILE, CONTEXT_CONTENT));
         this.repositorySelector = (pack, allowed) ->
             allowed.contains("demo-api") ? Optional.of("demo-api") : Optional.empty();
         this.router = routerMapping("PDEMO");
@@ -66,8 +66,9 @@ class AiRouterTest {
         assertThat(routed).isPresent();
         assertThat(routed.get().repositoryName()).isEqualTo("demo-api");
         assertThat(routed.get().proposal()).isEqualTo(PROPOSAL);
+        assertThat(routed.get().originalFiles()).containsExactly(entry(CONTEXT_FILE, CONTEXT_CONTENT));
         verify(aiFixClient).propose(any(EvidencePack.class),
-            eqMap(Map.of(CONTEXT_FILE, "class Mapper {}")));
+            eqMap(Map.of(CONTEXT_FILE, CONTEXT_CONTENT)));
     }
 
     /** The model's choice is validated against the allowlist before anything is read. */
@@ -145,15 +146,15 @@ class AiRouterTest {
     @Test
     void returnsEmptyWhenTheModelReportsNoProbableFix() {
         when(aiFixClient.propose(any(), anyMap()))
-            .thenReturn(new FixProposal(false, "no idea", "none", "diff --git a/x b/x\n"));
+            .thenReturn(new FixProposal(false, "no idea", "none", Map.of()));
 
         assertThat(router.route(pack("application_error"))).isEmpty();
     }
 
     @Test
-    void returnsEmptyWhenTheDiffIsBlank() {
+    void returnsEmptyWhenTheModelChangesNoFiles() {
         when(aiFixClient.propose(any(), anyMap()))
-            .thenReturn(new FixProposal(true, "null payment type", "summary", "   "));
+            .thenReturn(new FixProposal(true, "null payment type", "summary", Map.of()));
 
         assertThat(router.route(pack("application_error"))).isEmpty();
     }
@@ -167,12 +168,11 @@ class AiRouterTest {
         AgentProperties properties = new AgentProperties(
             "fixture", "PDEMO", null, null, null, null, null,
             new AgentProperties.GitHub("https://api.github.com", "token",
-                "hackathon/incident", List.of(".github/workflows/"),
+                "agent/incident", false, 5, List.of(".github/workflows/"),
                 Map.of("demo-api", new AgentProperties.RepositoryTarget(
-                    "acme/demo-api", "main", repository.toString(),
-                    List.of(CONTEXT_FILE), List.of("true"))),
+                    "acme/demo-api", "dev", List.of(CONTEXT_FILE))),
                 Map.of(mappedServiceId, "demo-api")));
-        return new AiRouter(aiFixClient, repositorySelector, new RepositoryContextReader(),
+        return new AiRouter(aiFixClient, repositorySelector, contextReader,
             new RepositoryResolver(properties));
     }
 

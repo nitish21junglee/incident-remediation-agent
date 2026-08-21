@@ -8,28 +8,47 @@ import org.junit.jupiter.api.Test;
 
 class FixtureAiFixClientTest {
 
+    private static final String PATH = "src/main/java/Mapper.java";
+
     private final FixtureAiFixClient client = new FixtureAiFixClient();
 
     @Test
     void loadsTheDeterministicProposal() {
-        FixProposal proposal = client.propose(null, Map.of());
+        FixProposal proposal = client.propose(null, Map.of(PATH, "class Mapper {}"));
 
         assertThat(proposal.probableFix()).isTrue();
-        assertThat(proposal.hypothesis())
-            .isEqualTo("PaymentMapper dereferences a missing optional payment type.");
-        assertThat(proposal.summary()).isEqualTo("Handle missing payment type");
-        assertThat(proposal.unifiedDiff())
-            .startsWith("diff --git a/src/main/java/com/example/demo/PaymentMapper.java")
-            .contains("--- a/src/main/java/com/example/demo/PaymentMapper.java")
-            .contains("+++ b/src/main/java/com/example/demo/PaymentMapper.java")
-            .contains("-        return payment.getType().name();")
-            .contains("+        return payment.getType() == null ? \"UNKNOWN\" : payment.getType().name();")
-            .endsWith("\n");
+        assertThat(proposal.hypothesis()).startsWith("Fixture proposal:");
+        assertThat(proposal.summary()).isEqualTo("Fixture change from the incident agent");
+    }
+
+    /**
+     * The changed file has to be one it was given, otherwise the gates would reject every fixture
+     * run for writing outside the allowlist.
+     */
+    @Test
+    void rewritesAFileItWasGiven() {
+        FixProposal proposal = client.propose(null, Map.of(PATH, "class Mapper {}"));
+
+        assertThat(proposal.files()).containsOnlyKeys(PATH);
+        assertThat(proposal.files().get(PATH))
+            .startsWith("class Mapper {}")
+            .contains("Not a real fix");
+    }
+
+    /** No files means nothing can be proposed, whatever the fixture says. */
+    @Test
+    void declinesWhenNoFilesWereRead() {
+        FixProposal proposal = client.propose(null, Map.of());
+
+        assertThat(proposal.probableFix()).isFalse();
+        assertThat(proposal.files()).isEmpty();
     }
 
     /** Determinism is the whole point of fixture mode; repeated calls must not drift. */
     @Test
     void returnsTheSameProposalEveryCall() {
-        assertThat(client.propose(null, Map.of())).isEqualTo(client.propose(null, Map.of()));
+        Map<String, String> files = Map.of(PATH, "class Mapper {}");
+
+        assertThat(client.propose(null, files)).isEqualTo(client.propose(null, files));
     }
 }

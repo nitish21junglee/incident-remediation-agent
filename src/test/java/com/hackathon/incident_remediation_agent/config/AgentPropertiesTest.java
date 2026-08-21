@@ -10,12 +10,11 @@ import org.springframework.boot.test.context.SpringBootTest;
     "agent.mode=fixture",
     "agent.service-id=PDEMO",
     "agent.jira.project-key=HACK",
+    "agent.github.push-enabled=true",
+    "agent.github.max-changed-files=3",
     "agent.github.repositories.demo-api.slug=acme/demo-api",
-    "agent.github.repositories.demo-api.directory=/tmp/demo-api",
+    "agent.github.repositories.demo-api.base-branch=dev",
     "agent.github.repositories.demo-api.context-files[0]=src/main/java/Mapper.java",
-    "agent.github.repositories.demo-api.validation-command[0]=./mvnw",
-    "agent.github.repositories.demo-api.validation-command[1]=-q",
-    "agent.github.repositories.demo-api.validation-command[2]=test",
     "agent.github.service-repositories.PDEMO=demo-api"
 })
 class AgentPropertiesTest {
@@ -31,7 +30,9 @@ class AgentPropertiesTest {
         assertThat(properties.github().serviceRepositories()).containsEntry("PDEMO", "demo-api");
         AgentProperties.RepositoryTarget target = properties.github().repositories().get("demo-api");
         assertThat(target.slug()).isEqualTo("acme/demo-api");
-        assertThat(target.validationCommand()).containsExactly("./mvnw", "-q", "test");
+        assertThat(target.baseBranch()).isEqualTo("dev");
         assertThat(target.contextFiles()).containsExactly("src/main/java/Mapper.java");
+        assertThat(properties.github().pushEnabled()).isTrue();
+        assertThat(properties.github().maxChangedFiles()).isEqualTo(3);
     }
 }

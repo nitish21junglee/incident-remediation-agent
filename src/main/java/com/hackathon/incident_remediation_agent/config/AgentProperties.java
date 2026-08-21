@@ -22,7 +22,20 @@ public record AgentProperties(
 
     public record Splunk(String baseUrl, String token, String query, String searchLink) {}
 
-    public record SignalFx(String realm, String token, String errorProgram, String latencyProgram, String dashboardLink) {}
+    /**
+     * @param defaultService {@code service.name} to query when the incident's own service name does
+     *                       not match a known {@code SignalFxService}. A sandbox PagerDuty service
+     *                       rarely carries the production name, so without this the demo collects
+     *                       no metrics at all.
+     */
+    public record SignalFx(
+        String realm,
+        String token,
+        String errorProgram,
+        String latencyProgram,
+        String dashboardLink,
+        String defaultService
+    ) {}
 
     public record Deployment(String version, String commitSha, String commitUrl, Instant deployedAt) {}
 
@@ -38,29 +51,33 @@ public record AgentProperties(
     ) {}
 
     /**
-     * @param repositories       short repository name to where it lives and how to validate it.
-     *                           This doubles as an allowlist: only names here can ever be cloned,
-     *                           patched or pushed.
+     * @param pushEnabled         when false the agent stops after the gates and reports what it
+     *                            would have done. Nothing is written to GitHub. Default false, so a
+     *                            misconfigured run cannot create a branch or a pull request.
+     * @param maxChangedFiles     upper bound on files one proposal may touch
+     * @param repositories        short repository name to where it lives. This doubles as an
+     *                            allowlist: only names here can ever be read or written.
      * @param serviceRepositories PagerDuty service id to the short repository name that owns it
      */
     public record GitHub(
         String apiBaseUrl,
         String token,
         String branchPrefix,
+        boolean pushEnabled,
+        int maxChangedFiles,
         List<String> protectedPaths,
         Map<String, RepositoryTarget> repositories,
         Map<String, String> serviceRepositories
     ) {}
 
     /**
-     * @param slug      the {@code owner/name} used against the GitHub API
-     * @param directory local checkout the workspace clones from
+     * @param slug         the {@code owner/name} used against the GitHub API
+     * @param baseBranch   branch the fix branch is cut from and the pull request targets
+     * @param contextFiles repository-relative paths that may be read and may be rewritten
      */
     public record RepositoryTarget(
         String slug,
         String baseBranch,
-        String directory,
-        List<String> contextFiles,
-        List<String> validationCommand
+        List<String> contextFiles
     ) {}
 }
