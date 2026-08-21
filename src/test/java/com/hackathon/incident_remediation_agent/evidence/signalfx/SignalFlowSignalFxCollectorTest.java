@@ -14,6 +14,9 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
 import com.hackathon.incident_remediation_agent.evidence.MetricEvidence;
@@ -24,6 +27,7 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
  * at the incident's trigger time. That split, and the decision to give up rather than guess when
  * SignalFx is unavailable, are what these tests pin down.
  */
+@ExtendWith(OutputCaptureExtension.class)
 class SignalFlowSignalFxCollectorTest {
 
     private SignalFxSignalFlowClient client;
@@ -94,6 +98,32 @@ class SignalFlowSignalFxCollectorTest {
             any(), any());
     }
 
+    @Test
+    void mapsTheDarsRepositoryNameToTheRewardSignalFxService() {
+        Instant triggered = Instant.now().minus(Duration.ofMinutes(10));
+        stub(SignalFxProgram.ERROR_COUNT, "[]");
+        stub(SignalFxProgram.REQUEST_COUNT, "[]");
+        stub(SignalFxProgram.LATENCY_BY_URI, "[]");
+
+        collector("leaderboard-service").collect(alert("darsrftp-service", triggered));
+
+        verify(this.client).query(eq(SignalFxProgram.ERROR_COUNT), eq(SignalFxService.REWARD),
+            any(), any());
+    }
+
+    @Test
+    void logsTheRawSignalFxResponse(CapturedOutput output) {
+        Instant triggered = Instant.now().minus(Duration.ofMinutes(10));
+        String raw = counts(triggered, 1, 40);
+        stub(SignalFxProgram.ERROR_COUNT, raw);
+        stub(SignalFxProgram.REQUEST_COUNT, "[]");
+        stub(SignalFxProgram.LATENCY_BY_URI, "[]");
+
+        collector().collect(alert("darsrftp-service", triggered));
+
+        assertThat(output).contains("SignalFx ERROR_COUNT response for reward-service: " + raw);
+    }
+
     /** A bare name should still match; PagerDuty rarely carries the "-service" suffix. */
     @Test
     void matchesAServiceNameWithoutTheSuffix() {
@@ -153,7 +183,7 @@ class SignalFlowSignalFxCollectorTest {
 
     private SignalFlowSignalFxCollector collector(String defaultService) {
         return new SignalFlowSignalFxCollector(this.client, new AgentProperties(
-            "fixture", "P2UX5VH", null, null,
+            "fixture", "P2UX5VH", null, null, null,
             new AgentProperties.SignalFx("eu0", "token", null, null,
                 "https://app.eu0.signalfx.com/#/dashboard/demo", defaultService),
             null, null, null));

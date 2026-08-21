@@ -103,6 +103,9 @@ public class SignalFlowSignalFxCollector implements SignalFxCollector {
             return Optional.empty();
         }
         String wanted = name.trim().toLowerCase(Locale.ROOT);
+        if ("darsrftp-service".equals(wanted)) {
+            wanted = SignalFxService.REWARD.filterValue().toLowerCase(Locale.ROOT);
+        }
         String suffixed = wanted.endsWith("-service") ? wanted : wanted + "-service";
         for (SignalFxService candidate : SignalFxService.values()) {
             String value = candidate.filterValue().toLowerCase(Locale.ROOT);
@@ -147,6 +150,7 @@ public class SignalFlowSignalFxCollector implements SignalFxCollector {
         Instant splitAt
     ) {
         String json = this.client.query(program, service, lookback, RESOLUTION);
+        log.info("SignalFx {} response for {}: {}", program, service.filterValue(), json);
         return split(parse(json), splitAt);
     }
 

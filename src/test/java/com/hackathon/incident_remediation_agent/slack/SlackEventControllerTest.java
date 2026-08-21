@@ -1,5 +1,6 @@
 package com.hackathon.incident_remediation_agent.slack;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -33,6 +34,9 @@ class SlackEventControllerTest {
     @Autowired
     MockMvc mockMvc;
 
+    @Autowired
+    IncidentRunStore store;
+
     @MockitoBean
     IncidentWorkflow workflow;
 
@@ -59,6 +63,19 @@ class SlackEventControllerTest {
             .andExpect(jsonPath("$.triggered").value(true));
 
         verify(workflow).start(any(IncidentRun.class));
+    }
+
+    @Test
+    void extractsTheServiceNameFromSlackAttachmentFields() throws Exception {
+        mockMvc.perform(post("/slack/events")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(fixture("PSLACKSERVICE")))
+            .andExpect(status().isOk());
+
+        assertThat(store.get("PSLACKSERVICE"))
+            .get()
+            .extracting(run -> run.alert().serviceName())
+            .isEqualTo("darsrftp-service");
     }
 
     @Test

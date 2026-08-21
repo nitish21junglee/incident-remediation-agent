@@ -48,13 +48,13 @@ public class RepositoryResolver {
     }
 
     public Optional<AgentProperties.RepositoryTarget> resolve(IncidentAlert alert) {
-        String repositoryName = this.repositoryNameByServiceId.get(upper(alert.serviceId()));
-        if (repositoryName == null) {
-            log.info("No repository mapped for service {}; skipping code investigation",
-                alert.serviceId());
+        Optional<String> repositoryName = repositoryNameFor(alert);
+        if (repositoryName.isEmpty()) {
+            log.info("No repository mapped for service id '{}' or name '{}'; skipping code investigation",
+                alert.serviceId(), alert.serviceName());
             return Optional.empty();
         }
-        return resolveByName(repositoryName);
+        return resolveByName(repositoryName.get());
     }
 
     /**
@@ -83,7 +83,15 @@ public class RepositoryResolver {
      * checks the allowlist.
      */
     public Optional<String> repositoryNameFor(IncidentAlert alert) {
-        return Optional.ofNullable(this.repositoryNameByServiceId.get(upper(alert.serviceId())));
+        String mapped = this.repositoryNameByServiceId.get(upper(alert.serviceId()));
+        if (mapped != null) {
+            return Optional.of(mapped);
+        }
+        if (!isBlank(alert.serviceId())) {
+            return Optional.empty();
+        }
+        String serviceName = lower(alert.serviceName());
+        return this.byName.containsKey(serviceName) ? Optional.of(serviceName) : Optional.empty();
     }
 
     /** @return every repository the agent is permitted to touch */

@@ -100,6 +100,7 @@ public class SlackEventController {
         String incidentId = urlMatcher.group(1);
         String incidentUrl = urlMatcher.group(0);
         String title = extractTitle(text, event);
+        String serviceName = extractServiceName(event);
 
         Instant triggeredAt = Instant.now();
         String ts = event.path("ts").asString();
@@ -117,9 +118,28 @@ public class SlackEventController {
             incidentId,
             title,
             "",
-            "",
+            serviceName,
             triggeredAt,
             URI.create(incidentUrl)));
+    }
+
+    private String extractServiceName(JsonNode event) {
+        JsonNode attachments = event.path("attachments");
+        if (!attachments.isArray()) {
+            return "";
+        }
+        for (JsonNode attachment : attachments) {
+            JsonNode fields = attachment.path("fields");
+            if (!fields.isArray()) {
+                continue;
+            }
+            for (JsonNode field : fields) {
+                if ("Service".equalsIgnoreCase(field.path("title").asString().trim())) {
+                    return field.path("value").asString().trim();
+                }
+            }
+        }
+        return "";
     }
 
     private String extractTitle(String text, JsonNode event) {

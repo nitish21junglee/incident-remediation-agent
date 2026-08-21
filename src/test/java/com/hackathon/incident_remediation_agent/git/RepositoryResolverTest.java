@@ -80,20 +80,32 @@ class RepositoryResolverTest {
         assertThat(resolver.allowedRepositories()).containsExactly("demo-api");
     }
 
+    @Test
+    void resolvesAnAllowlistedRepositoryFromTheSlackServiceName() {
+        RepositoryResolver resolver = resolver(
+            Map.of("darsrftp-service", DEMO), Map.of());
+
+        assertThat(resolver.resolve(alert("", "darsrftp-service"))).contains(DEMO);
+    }
+
     private static RepositoryResolver resolver(
         Map<String, AgentProperties.RepositoryTarget> repositories,
         Map<String, String> serviceRepositories
     ) {
         return new RepositoryResolver(new AgentProperties(
-            "fixture", "PDEMO", null, null, null, null, null,
+            "fixture", "PDEMO", null, null, null, null, null, null,
             new AgentProperties.GitHub("https://api.github.com", "token",
                 "agent/incident", false, 5, List.of(".github/workflows/"),
                 repositories, serviceRepositories)));
     }
 
     private static IncidentAlert alert(String serviceId) {
+        return alert(serviceId, "demo-api");
+    }
+
+    private static IncidentAlert alert(String serviceId, String serviceName) {
         return new IncidentAlert("01JDEMOEVENT", "PINCIDENT", "demo-api error rate increased",
-            serviceId, "demo-api", Instant.parse("2026-08-14T02:14:00Z"),
+            serviceId, serviceName, Instant.parse("2026-08-14T02:14:00Z"),
             URI.create("https://example.pagerduty.com/incidents/PINCIDENT"));
     }
 }
