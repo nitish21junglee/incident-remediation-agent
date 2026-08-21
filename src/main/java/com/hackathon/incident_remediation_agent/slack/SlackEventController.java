@@ -117,6 +117,7 @@ public class SlackEventController {
             incidentId,
             title,
             "",
+            "",
             triggeredAt,
             URI.create(incidentUrl)));
     }
