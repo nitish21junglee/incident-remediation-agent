@@ -71,11 +71,12 @@ public class JiraDocumentFactory {
         evidenceFacts(blocks, pack);
         logSamples(blocks, pack.logs());
 
-        heading(blocks, "No code investigation started");
+        heading(blocks, "No code change proposed");
         paragraph(blocks).add(text(
-            "The evidence was classified as '%s', so no code change was proposed. This needs a "
+            "The evidence was investigated and classified as '%s', but no code change came out of "
                 .formatted(pack.classification())
-                + "human to look at infrastructure or dependencies."));
+                + "it: either nothing in the logs pointed at a file this agent may change, or the "
+                + "model declined to propose one. This needs a human."));
 
         return document;
     }

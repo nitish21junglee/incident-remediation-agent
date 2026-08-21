@@ -95,16 +95,17 @@ class AiRouterTest {
         verifyNoAiCall();
     }
 
+    /**
+     * Classification is a label on the evidence, not a gate. An infrastructure-looking incident
+     * still reaches the model, because the stack frame is what decides whether there is anything
+     * to look at.
+     */
     @Test
-    void skipsInfrastructureClassification() {
-        assertThat(router.route(pack("infrastructure_or_dependency"))).isEmpty();
-        verifyNoAiCall();
-    }
+    void investigatesRegardlessOfClassification() {
+        when(aiFixClient.propose(any(), anyMap())).thenReturn(PROPOSAL);
 
-    @Test
-    void skipsUnknownClassification() {
-        assertThat(router.route(pack("unknown"))).isEmpty();
-        verifyNoAiCall();
+        assertThat(router.route(pack("infrastructure_or_dependency"))).isPresent();
+        assertThat(router.route(pack("unknown"))).isPresent();
     }
 
     @Test
@@ -139,13 +140,15 @@ class AiRouterTest {
             .contains("demo-api");
     }
 
+    /** A blank top error is no longer a gate either; the frames still name a file. */
     @Test
-    void skipsWhenTopErrorIsBlank() {
-        EvidencePack pack = new EvidencePack(alert(), ticket(), logs("  "),
+    void investigatesWhenTopErrorIsBlankButFramesRemain() {
+        when(aiFixClient.propose(any(), anyMap())).thenReturn(PROPOSAL);
+        EvidencePack pack = new EvidencePack(alert(), ticket(),
+            new LogEvidence(143, "  ", List.of(FRAME), null),
             metrics(), deployment(), null, "application_error", "v1");
 
-        assertThat(router.route(pack)).isEmpty();
-        verifyNoAiCall();
+        assertThat(router.route(pack)).isPresent();
     }
 
     @Test

@@ -134,7 +134,7 @@ class JiraDocumentFactoryTest {
 
         assertThat(text)
             .contains("Error rate during: ")
-            .contains("No code investigation started")
+            .contains("No code change proposed")
             .contains("infrastructure_or_dependency");
     }
 

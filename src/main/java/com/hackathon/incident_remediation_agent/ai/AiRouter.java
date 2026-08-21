@@ -24,8 +24,6 @@ import com.hackathon.incident_remediation_agent.git.RepositoryResolver;
 @Component
 public class AiRouter {
 
-    private static final String ELIGIBLE_CLASSIFICATION = "application_error";
-
     private static final Logger log = LoggerFactory.getLogger(AiRouter.class);
 
     private final AiFixClient aiFixClient;
@@ -103,20 +101,21 @@ public class AiRouter {
     }
 
     /**
-     * @return why the incident is ineligible, or {@code null} when AI should run
+     * Classification no longer decides this. Every incident is investigated, and what stops a run
+     * is the absence of something the investigation actually needs rather than an opinion about
+     * the incident's category: a stack frame pointing into an allowlisted repository, and a file
+     * behind it that can be read.
+     *
+     * @return why the incident cannot be investigated, or {@code null} when AI should run
      */
     private String ineligibilityReason(EvidencePack pack) {
-        if (!ELIGIBLE_CLASSIFICATION.equals(pack.classification())) {
-            return "classification is " + pack.classification();
-        }
+        // Both are written by the workflow before this runs; they are guarded because every log
+        // line and the pull request body dereference them.
         if (pack.ticket() == null || isBlank(pack.ticket().key())) {
             return "no Jira ticket";
         }
         if (isBlank(pack.evidenceVersion())) {
             return "no evidence version";
-        }
-        if (pack.logs() == null || isBlank(pack.logs().topError())) {
-            return "no top error in the logs";
         }
 
         return null;
