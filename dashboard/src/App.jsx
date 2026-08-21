@@ -42,6 +42,246 @@ function timeAgo(iso) {
   return `${Math.floor(seconds / 86400)}d ago`
 }
 
+function formatClock(ms) {
+  return new Date(ms).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatMetric(v) {
+  if (!Number.isFinite(v)) return '-'
+  const abs = Math.abs(v)
+  if (abs >= 1000) return v.toLocaleString('en-IN', { maximumFractionDigits: 0 })
+  if (abs >= 10) return v.toFixed(0)
+  if (abs >= 1) return v.toFixed(1)
+  if (v === 0) return '0'
+  return Number(v.toPrecision(2)).toString()
+}
+
+/**
+ * SignalFx returns each point with its label dimensions alongside timestampMs/value, so any other
+ * string field (service.name, k8s.namespace.name, ...) is what splits one program's points into
+ * series.
+ */
+function seriesLabelOf(point) {
+  for (const [key, value] of Object.entries(point)) {
+    if (key !== 'timestampMs' && key !== 'value' && typeof value === 'string') return value
+  }
+  return 'value'
+}
+
+/** rawPoints is stored as a JSON string, and is null when it was too large to persist. */
+function parseRawPoints(rawPoints) {
+  if (!rawPoints) return []
+
+  let parsed
+  try {
+    parsed = JSON.parse(rawPoints)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+
+  const bySeries = new Map()
+  for (const point of parsed) {
+    if (!Number.isFinite(point?.timestampMs) || !Number.isFinite(point?.value)) continue
+    const label = seriesLabelOf(point)
+    if (!bySeries.has(label)) bySeries.set(label, [])
+    bySeries.get(label).push({ t: point.timestampMs, v: point.value })
+  }
+
+  return [...bySeries.entries()]
+    .map(([label, points]) => ({ label, points: points.sort((a, b) => a.t - b.t) }))
+    .filter(s => s.points.length > 0)
+}
+
+function niceCeil(value) {
+  if (!(value > 0)) return 1
+  const magnitude = 10 ** Math.floor(Math.log10(value))
+  const normalized = value / magnitude
+  const step = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10
+  return step * magnitude
+}
+
+function useElementWidth() {
+  const ref = useRef(null)
+  const [width, setWidth] = useState(0)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setWidth(el.clientWidth)
+    const observer = new ResizeObserver(entries => setWidth(entries[0].contentRect.width))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return [ref, width]
+}
+
+// One hue, stepped by lightness, each step paired with its own dash pattern so overlapping series
+// stay separable without color alone and without adding a second hue to this UI.
+const SERIES_STYLES = [
+  { color: 'var(--chart-series-1)', dash: undefined },
+  { color: 'var(--chart-series-2)', dash: '7 4' },
+  { color: 'var(--chart-series-3)', dash: '2 3' },
+]
+
+const CHART_HEIGHT = 180
+const PAD = { top: 16, right: 16, bottom: 26, left: 48 }
+
+function MetricChart({ series, label }) {
+  const [wrapRef, width] = useElementWidth()
+  const [hoverIndex, setHoverIndex] = useState(null)
+
+  const axis = [...new Set(series.flatMap(s => s.points.map(p => p.t)))].sort((a, b) => a - b)
+  const tMin = axis[0]
+  const tMax = axis[axis.length - 1]
+  const yMax = niceCeil(Math.max(...series.flatMap(s => s.points.map(p => p.v))))
+
+  const innerW = Math.max(width - PAD.left - PAD.right, 10)
+  const innerH = CHART_HEIGHT - PAD.top - PAD.bottom
+
+  const xOf = t => (tMax === tMin ? PAD.left + innerW / 2 : PAD.left + ((t - tMin) / (tMax - tMin)) * innerW)
+  const yOf = v => PAD.top + innerH - (v / yMax) * innerH
+
+  const handleMove = e => {
+    const box = e.currentTarget.getBoundingClientRect()
+    const x = e.clientX - box.left
+    let nearest = 0
+    for (let i = 1; i < axis.length; i++) {
+      if (Math.abs(xOf(axis[i]) - x) < Math.abs(xOf(axis[nearest]) - x)) nearest = i
+    }
+    setHoverIndex(nearest)
+  }
+
+  const hoverT = hoverIndex === null ? null : axis[hoverIndex]
+  const hoverX = hoverT === null ? 0 : xOf(hoverT)
+  const hoverRows = hoverT === null
+    ? []
+    : series
+      .map((s, i) => ({ label: s.label, style: SERIES_STYLES[i % SERIES_STYLES.length], point: s.points.find(p => p.t === hoverT) }))
+      .filter(row => row.point)
+
+  const yTicks = [0, yMax / 2, yMax]
+
+  return (
+    <div className="chart-wrap" ref={wrapRef}>
+      {series.length > 1 && (
+        <div className="chart-legend">
+          {series.map((s, i) => {
+            const style = SERIES_STYLES[i % SERIES_STYLES.length]
+            return (
+              <span className="chart-legend-item" key={s.label}>
+                <svg width="18" height="8" aria-hidden="true">
+                  <line x1="0" y1="4" x2="18" y2="4" stroke={style.color} strokeWidth="2"
+                        strokeDasharray={style.dash} />
+                </svg>
+                {s.label}
+              </span>
+            )
+          })}
+        </div>
+      )}
+
+      {width > 0 && (
+        <svg
+          width={width}
+          height={CHART_HEIGHT}
+          role="img"
+          aria-label={`${label}: ${formatMetric(Math.min(...series.flatMap(s => s.points.map(p => p.v))))} to ${formatMetric(Math.max(...series.flatMap(s => s.points.map(p => p.v))))} between ${formatClock(tMin)} and ${formatClock(tMax)}`}
+          onMouseMove={handleMove}
+          onMouseLeave={() => setHoverIndex(null)}
+        >
+          {yTicks.map(tick => (
+            <g key={tick}>
+              <line className="chart-grid" x1={PAD.left} y1={yOf(tick)} x2={PAD.left + innerW} y2={yOf(tick)} />
+              <text className="chart-axis-label" x={PAD.left - 8} y={yOf(tick)} textAnchor="end" dominantBaseline="middle">
+                {formatMetric(tick)}
+              </text>
+            </g>
+          ))}
+
+          <text className="chart-axis-label" x={PAD.left} y={CHART_HEIGHT - 8}>{formatClock(tMin)}</text>
+          <text className="chart-axis-label" x={PAD.left + innerW} y={CHART_HEIGHT - 8} textAnchor="end">
+            {formatClock(tMax)}
+          </text>
+
+          {series.map((s, i) => {
+            const style = SERIES_STYLES[i % SERIES_STYLES.length]
+            const path = s.points.map((p, idx) => `${idx === 0 ? 'M' : 'L'}${xOf(p.t)},${yOf(p.v)}`).join(' ')
+            return (
+              <g key={s.label}>
+                {series.length === 1 && s.points.length > 1 && (
+                  <path
+                    className="chart-area"
+                    d={`${path} L${xOf(s.points[s.points.length - 1].t)},${yOf(0)} L${xOf(s.points[0].t)},${yOf(0)} Z`}
+                  />
+                )}
+                <path d={path} fill="none" stroke={style.color} strokeWidth="2" strokeDasharray={style.dash}
+                      strokeLinejoin="round" strokeLinecap="round" />
+                {s.points.length === 1 && (
+                  <circle cx={xOf(s.points[0].t)} cy={yOf(s.points[0].v)} r="4" fill={style.color} />
+                )}
+              </g>
+            )
+          })}
+
+          {hoverT !== null && (
+            <g>
+              <line className="chart-crosshair" x1={hoverX} y1={PAD.top} x2={hoverX} y2={PAD.top + innerH} />
+              {hoverRows.map(row => (
+                <circle key={row.label} cx={hoverX} cy={yOf(row.point.v)} r="4"
+                        fill={row.style.color} stroke="var(--surface)" strokeWidth="2" />
+              ))}
+            </g>
+          )}
+        </svg>
+      )}
+
+      {hoverT !== null && hoverRows.length > 0 && (
+        <div
+          className="chart-tooltip"
+          style={{ left: Math.min(Math.max(hoverX, 60), Math.max(width - 60, 60)) }}
+        >
+          <div className="chart-tooltip-time">{formatClock(hoverT)}</div>
+          {hoverRows.map(row => (
+            <div className="chart-tooltip-row" key={row.label}>
+              <span className="chart-tooltip-label">{row.label}</span>
+              <span className="chart-tooltip-value">{formatMetric(row.point.v)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProgramCharts({ programExports }) {
+  return (
+    <div className="detail-section">
+      <h3>SignalFx Programs</h3>
+      {programExports.map(exp => {
+        const series = parseRawPoints(exp.rawPoints)
+        return (
+          <div className="chart-card" key={exp.program}>
+            <div className="chart-card-head">
+              <span className="chart-card-title">{exp.program}</span>
+              <span className="chart-card-meta">{exp.pointCount} pts</span>
+            </div>
+            <div className="chart-card-filter">{exp.filter}</div>
+            {exp.error ? (
+              <div className="chart-empty">{exp.error}</div>
+            ) : series.length > 0 ? (
+              <MetricChart series={series} label={exp.program} />
+            ) : (
+              <div className="chart-empty">No points stored for this program</div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function StatsCards({ stats }) {
   return (
     <div className="stats-grid">
@@ -66,26 +306,6 @@ function StatsCards({ stats }) {
 }
 
 
-function ErrorRateCell({ signalFxExports }) {
-  if (!signalFxExports) return <span style={{ color: 'var(--text-muted)' }}>-</span>
-
-  const before = signalFxExports.errorRateBefore ?? 0
-  const during = signalFxExports.errorRateDuring ?? 0
-  const max = Math.max(before, during, 1)
-
-  return (
-    <div className="error-rate-cell">
-      <div className="error-bar-container">
-        <div className="error-bar before" style={{ height: `${(before / max) * 20}px` }} />
-        <div className="error-bar during" style={{ height: `${(during / max) * 20}px` }} />
-      </div>
-      <div className="error-labels">
-        {before.toFixed(1)} / {during.toFixed(1)}
-      </div>
-    </div>
-  )
-}
-
 // Every effect is built from plain colored shapes (dots, ribbons, sparks) in shades of blue and
 // white — no emoji glyphs — so the row-hover celebration/explosion effects can stay without
 // pulling a second color or any pictographs into the UI.
@@ -106,10 +326,8 @@ const STATUS_EFFECT_MAP = {
 
 function ScreenEffects({ type, origin }) {
   const [particles, setParticles] = useState([])
-  const [confetti, setConfetti] = useState([])
   const [fireworks, setFireworks] = useState([])
   const [flash, setFlash] = useState(null)
-  const [shaking, setShaking] = useState(false)
   const hasFired = useRef(false)
 
   useEffect(() => {
@@ -157,26 +375,6 @@ function ScreenEffects({ type, origin }) {
     setTimeout(() => setParticles([]), dur)
   }
 
-  function spawnConfetti(count = 50) {
-    const vw = window.innerWidth
-    const pieces = []
-    for (let i = 0; i < count; i++) {
-      pieces.push({
-        id: Date.now() + i,
-        color: EFFECT_COLORS[i % EFFECT_COLORS.length],
-        x: Math.random() * vw,
-        w: 8 + Math.random() * 8,
-        h: 14 + Math.random() * 10,
-        sway: (Math.random() - 0.5) * 200,
-        spin: (Math.random() - 0.5) * 1080,
-        delay: Math.random() * 800,
-        fallDuration: 2500 + Math.random() * 2000,
-      })
-    }
-    setConfetti(pieces)
-    setTimeout(() => setConfetti([]), 5000)
-  }
-
   function spawnFireworks(count = 3) {
     const vw = window.innerWidth
     const all = []
@@ -213,18 +411,15 @@ function ScreenEffects({ type, origin }) {
     ]
   }
 
-  // FAILED — full-screen burst + screen shake
+  // FAILED — full-screen burst
   function triggerExplosion() {
     doFlash('strong')
-    setShaking(true)
-    setTimeout(() => setShaking(false), 500)
     spawnParticles(screenCenters(), { count: 12, spread: 600, sizeMax: 16 })
   }
 
-  // COMPLETED — confetti rain + fireworks
+  // COMPLETED — fireworks
   function triggerCelebration() {
     doFlash('blue')
-    spawnConfetti(60)
     spawnFireworks(3)
   }
 
@@ -241,10 +436,9 @@ function ScreenEffects({ type, origin }) {
     spawnParticles(centers, { count: 8, spread: 450, sizeMin: 6, sizeMax: 14 })
   }
 
-  // JIRA_CREATED / JIRA_CONTEXT_PUBLISHED — ribbons + sparks
+  // JIRA_CREATED / JIRA_CONTEXT_PUBLISHED — sparks
   function triggerJira() {
     doFlash('blue')
-    spawnConfetti(40)
     const vw = window.innerWidth, vh = window.innerHeight
     spawnParticles([
       origin,
@@ -279,10 +473,9 @@ function ScreenEffects({ type, origin }) {
     spawnFireworks(2)
   }
 
-  // DRAFT_PR_CREATED — ribbons + sparks
+  // DRAFT_PR_CREATED — sparks
   function triggerPR() {
     doFlash('blue')
-    spawnConfetti(45)
     const vw = window.innerWidth, vh = window.innerHeight
     spawnParticles([
       origin,
@@ -303,12 +496,11 @@ function ScreenEffects({ type, origin }) {
     ], { count: 7, spread: 350, sizeMin: 5, sizeMax: 10, dur: 2000 })
   }
 
-  if (!particles.length && !confetti.length && !fireworks.length && !flash) return null
+  if (!particles.length && !fireworks.length && !flash) return null
 
   return (
     <>
       {flash && <div className={`screen-flash ${flash}`} />}
-      {shaking && <style>{`.dashboard { animation: screenShake 0.5s ease-out; }`}</style>}
       <div className="effects-container">
         {particles.map(p => (
           <div
@@ -324,23 +516,6 @@ function ScreenEffects({ type, origin }) {
               '--rot': `${p.rot}deg`,
               '--delay': `${p.delay}ms`,
               '--duration': `${p.duration}ms`,
-            }}
-          />
-        ))}
-
-        {confetti.map(c => (
-          <div
-            key={c.id}
-            className="confetti-piece"
-            style={{
-              left: c.x,
-              '--sway': `${c.sway}px`,
-              '--spin': `${c.spin}deg`,
-              '--delay': `${c.delay}ms`,
-              '--fall-duration': `${c.fallDuration}ms`,
-              '--w': `${c.w}px`,
-              '--h': `${c.h}px`,
-              '--color': c.color,
             }}
           />
         ))}
@@ -431,14 +606,13 @@ function IncidentsTable({ incidents, onSelect }) {
               <th>Jira</th>
               <th>Status</th>
               <th>Pull Requests</th>
-              <th>Error Rate (Before/During)</th>
               <th>Latency</th>
               <th>Time</th>
             </tr>
           </thead>
           <tbody>
             {incidents.length === 0 && (
-              <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No incidents yet</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No incidents yet</td></tr>
             )}
             {incidents.map(inc => (
               <tr
@@ -466,7 +640,6 @@ function IncidentsTable({ incidents, onSelect }) {
                   </span>
                 </td>
                 <td><PullRequestLinks incident={inc} /></td>
-                <td><ErrorRateCell signalFxExports={inc.signalFxExports} /></td>
                 <td>
                   {inc.signalFxExports ? (
                     <span className={`latency-indicator ${inc.signalFxExports.latencyChanged ? 'changed' : 'unchanged'}`}>
@@ -606,39 +779,7 @@ function DetailModal({ incident, onClose }) {
         </div>
 
         {incident.signalFxExports?.exports?.length > 0 && (
-          <div className="detail-section">
-            <h3>SignalFx Programs</h3>
-            <div className="table-wrap">
-              <table className="export-table">
-                <thead>
-                  <tr>
-                    <th>Program</th>
-                    <th>Filter</th>
-                    <th>Points</th>
-                    <th>Before (sum / mean / max)</th>
-                    <th>During (sum / mean / max)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {incident.signalFxExports.exports.map(exp => (
-                    <tr key={exp.program}>
-                      <td>{exp.program}</td>
-                      <td className="export-filter">{exp.filter}</td>
-                      <td>{exp.pointCount}</td>
-                      {exp.error ? (
-                        <td colSpan={2} style={{ color: 'var(--text-muted)' }}>{exp.error}</td>
-                      ) : (
-                        <>
-                          <td>{exp.before.sum.toFixed(2)} / {exp.before.mean.toFixed(2)} / {exp.before.max.toFixed(2)}</td>
-                          <td>{exp.during.sum.toFixed(2)} / {exp.during.mean.toFixed(2)} / {exp.during.max.toFixed(2)}</td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ProgramCharts programExports={incident.signalFxExports.exports} />
         )}
 
         {incident.splunkLogs && (
