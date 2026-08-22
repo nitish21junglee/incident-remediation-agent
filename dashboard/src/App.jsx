@@ -14,32 +14,10 @@ const STAGE_LABELS = {
   FAILED: 'Failed',
 }
 
-const TIMELINE_MARKS = {
-  RECEIVED: { text: 'RCV', cls: 'received' },
-  JIRA_CREATED: { text: 'JRA', cls: 'jira' },
-  COLLECTING_CONTEXT: { text: 'CTX', cls: 'evidence' },
-  JIRA_CONTEXT_PUBLISHED: { text: 'PUB', cls: 'jira' },
-  AI_INVESTIGATING: { text: 'AI', cls: 'evidence' },
-  AI_SKIPPED: { text: 'SKIP', cls: 'skipped' },
-  VALIDATING: { text: 'VAL', cls: 'evidence' },
-  DRAFT_PR_CREATED: { text: 'PR', cls: 'pr' },
-  COMPLETED: { text: 'OK', cls: 'completed' },
-  FAILED: { text: 'ERR', cls: 'failed' },
-}
-
 function formatTime(iso) {
   if (!iso) return '-'
   const d = new Date(iso)
   return d.toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-function timeAgo(iso) {
-  if (!iso) return ''
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return `${Math.floor(seconds / 86400)}d ago`
 }
 
 function formatClock(ms) {
@@ -306,243 +284,9 @@ function StatsCards({ stats }) {
 }
 
 
-// Every effect is built from plain colored shapes (dots, ribbons, sparks) in shades of blue and
-// white — no emoji glyphs — so the row-hover celebration/explosion effects can stay without
-// pulling a second color or any pictographs into the UI.
-const EFFECT_COLORS = ['var(--blue)', 'var(--blue-strong)', 'var(--blue-border)', '#ffffff']
-
-const STATUS_EFFECT_MAP = {
-  FAILED: 'explosion',
-  COMPLETED: 'celebration',
-  RECEIVED: 'received',
-  JIRA_CREATED: 'jira',
-  COLLECTING_CONTEXT: 'collecting',
-  JIRA_CONTEXT_PUBLISHED: 'jira',
-  AI_INVESTIGATING: 'ai',
-  AI_SKIPPED: 'skipped',
-  VALIDATING: 'ai',
-  DRAFT_PR_CREATED: 'pr',
-}
-
-function ScreenEffects({ type, origin }) {
-  const [particles, setParticles] = useState([])
-  const [fireworks, setFireworks] = useState([])
-  const [flash, setFlash] = useState(null)
-  const hasFired = useRef(false)
-
-  useEffect(() => {
-    if (type && !hasFired.current) {
-      hasFired.current = true
-
-      if (type === 'explosion') triggerExplosion()
-      else if (type === 'celebration') triggerCelebration()
-      else if (type === 'received') triggerReceived()
-      else if (type === 'jira') triggerJira()
-      else if (type === 'collecting') triggerCollecting()
-      else if (type === 'ai') triggerAI()
-      else if (type === 'pr') triggerPR()
-      else if (type === 'skipped') triggerSkipped()
-    }
-    if (!type) {
-      hasFired.current = false
-    }
-  }, [type, origin])
-
-  function doFlash(variant = 'blue', duration = 500) {
-    setFlash(variant)
-    setTimeout(() => setFlash(null), duration)
-  }
-
-  function spawnParticles(centers, { count = 10, spread = 500, sizeMin = 6, sizeMax = 12, dur = 2500 } = {}) {
-    const all = []
-    centers.forEach((center, ci) => {
-      for (let i = 0; i < count; i++) {
-        all.push({
-          id: Date.now() + ci * 100 + i,
-          color: EFFECT_COLORS[(ci * 3 + i) % EFFECT_COLORS.length],
-          x: center.x + (Math.random() - 0.5) * 40,
-          y: center.y + (Math.random() - 0.5) * 20,
-          tx: (Math.random() - 0.5) * spread,
-          ty: (Math.random() - 0.5) * spread - 60,
-          rot: (Math.random() - 0.5) * 900,
-          size: sizeMin + Math.random() * (sizeMax - sizeMin),
-          delay: ci * 100 + Math.random() * 150,
-          duration: 800 + Math.random() * 600,
-        })
-      }
-    })
-    setParticles(all)
-    setTimeout(() => setParticles([]), dur)
-  }
-
-  function spawnFireworks(count = 3) {
-    const vw = window.innerWidth
-    const all = []
-    for (let ci = 0; ci < count; ci++) {
-      const cx = vw * (0.2 + ci * 0.3)
-      const cy = 80 + Math.random() * 80
-      for (let i = 0; i < 14; i++) {
-        const angle = (i / 14) * Math.PI * 2
-        const dist = 60 + Math.random() * 80
-        all.push({
-          id: Date.now() + 1000 + ci * 100 + i,
-          x: cx, y: cy,
-          fx: Math.cos(angle) * dist,
-          fy: Math.sin(angle) * dist,
-          color: EFFECT_COLORS[(ci * 5 + i) % EFFECT_COLORS.length],
-          delay: ci * 300 + Math.random() * 100,
-          duration: 800 + Math.random() * 400,
-        })
-      }
-    }
-    setFireworks(all)
-    setTimeout(() => setFireworks([]), 3000)
-  }
-
-  function screenCenters() {
-    const vw = window.innerWidth, vh = window.innerHeight
-    return [
-      origin,
-      { x: vw * 0.15, y: vh * 0.25 },
-      { x: vw * 0.85, y: vh * 0.2 },
-      { x: vw * 0.5, y: vh * 0.1 },
-      { x: vw * 0.3, y: vh * 0.75 },
-      { x: vw * 0.75, y: vh * 0.7 },
-    ]
-  }
-
-  // FAILED — full-screen burst
-  function triggerExplosion() {
-    doFlash('strong')
-    spawnParticles(screenCenters(), { count: 12, spread: 600, sizeMax: 16 })
-  }
-
-  // COMPLETED — fireworks
-  function triggerCelebration() {
-    doFlash('blue')
-    spawnFireworks(3)
-  }
-
-  // RECEIVED — sparks radiating from center
-  function triggerReceived() {
-    doFlash('blue')
-    const vw = window.innerWidth, vh = window.innerHeight
-    const centers = [
-      origin,
-      { x: vw * 0.5, y: vh * 0.1 },
-      { x: vw * 0.2, y: vh * 0.5 },
-      { x: vw * 0.8, y: vh * 0.4 },
-    ]
-    spawnParticles(centers, { count: 8, spread: 450, sizeMin: 6, sizeMax: 14 })
-  }
-
-  // JIRA_CREATED / JIRA_CONTEXT_PUBLISHED — sparks
-  function triggerJira() {
-    doFlash('blue')
-    const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles([
-      origin,
-      { x: vw * 0.3, y: vh * 0.2 },
-      { x: vw * 0.7, y: vh * 0.3 },
-    ], { count: 8, spread: 400, sizeMin: 6, sizeMax: 12 })
-  }
-
-  // COLLECTING_CONTEXT — scanning sparks
-  function triggerCollecting() {
-    doFlash('blue')
-    const vw = window.innerWidth, vh = window.innerHeight
-    const scanPoints = []
-    for (let i = 0; i < 5; i++) {
-      scanPoints.push({ x: vw * (0.1 + i * 0.2), y: vh * (0.2 + Math.random() * 0.5) })
-    }
-    spawnParticles([origin, ...scanPoints], { count: 6, spread: 350, sizeMin: 6, sizeMax: 12 })
-  }
-
-  // AI_INVESTIGATING / VALIDATING — sparks + fireworks
-  function triggerAI() {
-    doFlash('blue')
-    const vw = window.innerWidth, vh = window.innerHeight
-    const centers = [
-      origin,
-      { x: vw * 0.5, y: vh * 0.15 },
-      { x: vw * 0.2, y: vh * 0.4 },
-      { x: vw * 0.8, y: vh * 0.35 },
-      { x: vw * 0.4, y: vh * 0.7 },
-    ]
-    spawnParticles(centers, { count: 8, spread: 400, sizeMin: 6, sizeMax: 14 })
-    spawnFireworks(2)
-  }
-
-  // DRAFT_PR_CREATED — sparks
-  function triggerPR() {
-    doFlash('blue')
-    const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles([
-      origin,
-      { x: vw * 0.25, y: vh * 0.3 },
-      { x: vw * 0.75, y: vh * 0.25 },
-      { x: vw * 0.5, y: vh * 0.6 },
-    ], { count: 8, spread: 450, sizeMin: 6, sizeMax: 12 })
-  }
-
-  // AI_SKIPPED — a light drift of sparks
-  function triggerSkipped() {
-    doFlash('blue', 300)
-    const vw = window.innerWidth, vh = window.innerHeight
-    spawnParticles([
-      origin,
-      { x: vw * 0.3, y: vh * 0.3 },
-      { x: vw * 0.7, y: vh * 0.5 },
-    ], { count: 7, spread: 350, sizeMin: 5, sizeMax: 10, dur: 2000 })
-  }
-
-  if (!particles.length && !fireworks.length && !flash) return null
-
-  return (
-    <>
-      {flash && <div className={`screen-flash ${flash}`} />}
-      <div className="effects-container">
-        {particles.map(p => (
-          <div
-            key={p.id}
-            className="explosion-particle"
-            style={{
-              left: p.x,
-              top: p.y,
-              '--size': `${p.size}px`,
-              '--color': p.color,
-              '--tx': `${p.tx}px`,
-              '--ty': `${p.ty}px`,
-              '--rot': `${p.rot}deg`,
-              '--delay': `${p.delay}ms`,
-              '--duration': `${p.duration}ms`,
-            }}
-          />
-        ))}
-
-        {fireworks.map(f => (
-          <div
-            key={f.id}
-            className="firework-burst"
-            style={{
-              left: f.x,
-              top: f.y,
-              '--fx': `${f.fx}px`,
-              '--fy': `${f.fy}px`,
-              '--color': f.color,
-              '--delay': `${f.delay}ms`,
-              '--duration': `${f.duration}ms`,
-            }}
-          />
-        ))}
-      </div>
-    </>
-  )
-}
-
 function PullRequestLinks({ incident }) {
-  const { fixPullRequest, revertPullRequest } = incident
-  if (!fixPullRequest && !revertPullRequest) {
+  const { fixPullRequest, revertPullRequest, lastPullRequest } = incident
+  if (!fixPullRequest && !revertPullRequest && !lastPullRequest) {
     return <span style={{ color: 'var(--text-muted)' }}>-</span>
   }
   return (
@@ -559,41 +303,20 @@ function PullRequestLinks({ incident }) {
           Revert #{revertPullRequest.number}
         </a>
       )}
+      {lastPullRequest && (
+        <a className="pr-link suspect" href={lastPullRequest.url} target="_blank" rel="noreferrer"
+           title={lastPullRequest.title || undefined}
+           onClick={e => e.stopPropagation()}>
+          Suspect #{lastPullRequest.number}
+        </a>
+      )}
     </div>
   )
 }
 
 function IncidentsTable({ incidents, onSelect }) {
-  const [effectType, setEffectType] = useState(null)
-  const [effectOrigin, setEffectOrigin] = useState({ x: 0, y: 0 })
-  const activeRow = useRef(null)
-
-  const handleRowHover = (e, inc) => {
-    if (activeRow.current === inc.incidentId) return
-    activeRow.current = inc.incidentId
-
-    const rect = e.currentTarget.getBoundingClientRect()
-    const origin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-    setEffectOrigin(origin)
-
-    const effect = STATUS_EFFECT_MAP[inc.status]
-    if (effect) setEffectType(effect)
-  }
-
-  const handleRowLeave = () => {
-    activeRow.current = null
-    setEffectType(null)
-  }
-
-  const rowClass = (status) => {
-    if (status === 'FAILED') return 'failed-row'
-    if (status === 'COMPLETED') return 'completed-row'
-    return 'effect-row'
-  }
-
   return (
     <div className="table-section">
-      <ScreenEffects type={effectType} origin={effectOrigin} />
       <div className="table-header">
         <h2>Incidents</h2>
         <span className="count-badge">{incidents.length}</span>
@@ -615,13 +338,7 @@ function IncidentsTable({ incidents, onSelect }) {
               <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 40 }}>No incidents yet</td></tr>
             )}
             {incidents.map(inc => (
-              <tr
-                key={inc.incidentId}
-                className={rowClass(inc.status)}
-                onClick={() => onSelect(inc)}
-                onMouseEnter={e => handleRowHover(e, inc)}
-                onMouseLeave={handleRowLeave}
-              >
+              <tr key={inc.incidentId} onClick={() => onSelect(inc)}>
                 <td>
                   <span className="incident-id">{inc.incidentId}</span>
                 </td>
@@ -654,45 +371,6 @@ function IncidentsTable({ incidents, onSelect }) {
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
-  )
-}
-
-function Timeline({ incidents }) {
-  const items = incidents.slice(0, 20).map(inc => ({
-    id: inc.incidentId,
-    status: inc.status,
-    jiraKey: inc.jiraKey,
-    timestamp: inc.timestamp,
-    hypothesis: inc.aiOutput?.hypothesis,
-  }))
-
-  return (
-    <div className="timeline-section">
-      <div className="timeline-header">
-        <h2>Recent Activity</h2>
-      </div>
-      <div className="timeline-list">
-        {items.length === 0 && <div className="empty-state">No activity</div>}
-        {items.map(item => {
-          const mark = TIMELINE_MARKS[item.status] || TIMELINE_MARKS.RECEIVED
-          return (
-            <div className="timeline-item" key={item.id + item.status}>
-              <div className={`timeline-icon ${mark.cls}`}>{mark.text}</div>
-              <div className="timeline-content">
-                <div className="timeline-title">
-                  {item.id}{item.jiraKey ? ` • ${item.jiraKey}` : ''}
-                </div>
-                <div className="timeline-meta">
-                  {STAGE_LABELS[item.status] || item.status}
-                  {item.hypothesis && ` — ${item.hypothesis.substring(0, 60)}...`}
-                  {' • '}{timeAgo(item.timestamp)}
-                </div>
-              </div>
-            </div>
-          )
-        })}
       </div>
     </div>
   )
@@ -743,6 +421,16 @@ function DetailModal({ incident, onClose }) {
             ) : '-'}
           </span>
 
+          <span className="detail-label">Suspect PR</span>
+          <span className="detail-value">
+            {incident.lastPullRequest ? (
+              <a className="pr-link suspect" href={incident.lastPullRequest.url} target="_blank" rel="noreferrer">
+                #{incident.lastPullRequest.number}
+                {incident.lastPullRequest.title ? ` ${incident.lastPullRequest.title}` : ''}
+              </a>
+            ) : '-'}
+          </span>
+
           <span className="detail-label">Revert PR</span>
           <span className="detail-value">
             {incident.revertPullRequest ? (
@@ -769,7 +457,7 @@ function DetailModal({ incident, onClose }) {
                   <span className="detail-label">Dashboard</span>
                   <span className="detail-value">
                     <a className="jira-link" href={incident.signalFxExports.dashboardUrl} target="_blank" rel="noreferrer">
-                      Open Dashboard
+                      Open SignalFx Dashboard
                     </a>
                   </span>
                 </>
@@ -997,10 +685,7 @@ export default function App() {
 
       <StatsCards stats={stats} />
 
-      <div className="content-grid">
-        <IncidentsTable incidents={incidents} onSelect={handleSelect} />
-        <Timeline incidents={incidents} />
-      </div>
+      <IncidentsTable incidents={incidents} onSelect={handleSelect} />
 
       <DetailModal incident={selected} onClose={() => setSelected(null)} />
     </div>

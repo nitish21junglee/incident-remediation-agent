@@ -119,11 +119,6 @@ body::before {
   to { opacity: 1; }
 }
 
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: scale(1); }
@@ -132,11 +127,6 @@ body::before {
 @keyframes countUp {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
 }
 
 @keyframes spin {
@@ -151,11 +141,6 @@ body::before {
 @keyframes dotPulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(43, 108, 176, 0.4); }
   50% { box-shadow: 0 0 0 6px rgba(43, 108, 176, 0); }
-}
-
-@keyframes slideDown {
-  from { opacity: 0; max-height: 0; }
-  to { opacity: 1; max-height: 600px; }
 }
 
 /* ── Dashboard layout ── */
@@ -362,13 +347,6 @@ body::before {
   opacity: 0.5;
 }
 
-/* ── Content grid ── */
-.content-grid {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 16px;
-}
-
 /* ── Table ── */
 .table-section {
   background: var(--surface);
@@ -436,11 +414,10 @@ body::before {
 
 .incidents-table tbody tr {
   cursor: pointer;
-  transition: all 0.15s ease;
 }
 
 .incidents-table tbody tr:hover td {
-  background: var(--accent-light);
+  background: var(--surface-hover);
 }
 
 .incidents-table tbody tr {
@@ -505,6 +482,12 @@ body::before {
   border: 1px solid var(--purple-border);
 }
 
+.pr-link.suspect {
+  background: var(--surface-hover);
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+
 .pr-link.revert {
   color: var(--red);
   background: var(--red-light);
@@ -522,11 +505,6 @@ body::before {
   font-weight: 600;
   white-space: nowrap;
   border: 1px solid transparent;
-  transition: transform 0.15s ease;
-}
-
-.status-badge:hover {
-  transform: scale(1.05);
 }
 
 /* Every stage badge is the same blue outline treatment; FAILED is the one solid, filled
@@ -569,105 +547,6 @@ body::before {
 
 .latency-indicator.changed { color: var(--red); }
 .latency-indicator.unchanged { color: var(--green); }
-
-/* ── Timeline ── */
-.timeline-section {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  animation: slideInRight 0.5s ease-out 0.35s both;
-}
-
-.timeline-header {
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--border);
-}
-
-.timeline-header h2 {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.timeline-list {
-  padding: 8px 16px;
-  max-height: 520px;
-  overflow-y: auto;
-}
-
-.timeline-item {
-  display: flex;
-  gap: 14px;
-  padding: 14px 6px;
-  border-bottom: 1px solid var(--border-light);
-  transition: all 0.2s ease;
-  border-radius: var(--radius-sm);
-  animation: fadeInUp 0.4s ease-out both;
-}
-
-.timeline-item:nth-child(1) { animation-delay: 0.4s; }
-.timeline-item:nth-child(2) { animation-delay: 0.5s; }
-.timeline-item:nth-child(3) { animation-delay: 0.6s; }
-.timeline-item:nth-child(4) { animation-delay: 0.7s; }
-.timeline-item:nth-child(5) { animation-delay: 0.8s; }
-.timeline-item:nth-child(6) { animation-delay: 0.9s; }
-
-.timeline-item:last-child {
-  border-bottom: none;
-}
-
-.timeline-item:hover {
-  background: var(--surface-hover);
-}
-
-.timeline-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
-  color: var(--blue);
-  flex-shrink: 0;
-  border: 1px solid transparent;
-  transition: transform 0.2s ease;
-}
-
-.timeline-item:hover .timeline-icon {
-  transform: scale(1.1);
-}
-
-.timeline-icon.received { background: var(--blue-light); border-color: var(--blue-border); }
-.timeline-icon.jira { background: var(--purple-light); border-color: var(--purple-border); }
-.timeline-icon.evidence { background: var(--yellow-light); border-color: var(--yellow-border); }
-.timeline-icon.pr { background: var(--purple-light); border-color: var(--purple-border); }
-.timeline-icon.failed { background: var(--red-light); border-color: var(--red-border); }
-.timeline-icon.completed { background: var(--green-light); border-color: var(--green-border); }
-.timeline-icon.skipped { background: var(--accent-light); border-color: var(--accent-border); }
-
-.timeline-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.timeline-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 3px;
-  color: var(--text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.timeline-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.4;
-}
 
 /* ── Detail modal ── */
 .modal-overlay {
@@ -947,129 +826,7 @@ body::before {
   font-size: 14px;
 }
 
-/* ── Failed row glow ── */
-.incidents-table tbody tr.failed-row:hover td {
-  background: var(--blue-light);
-}
-
-.incidents-table tbody tr.failed-row:hover {
-  box-shadow: 0 0 20px rgba(43, 108, 176, 0.2);
-}
-
-/* ── Completed row glow ── */
-.incidents-table tbody tr.completed-row:hover td {
-  background: var(--blue-light);
-}
-
-.incidents-table tbody tr.completed-row:hover {
-  box-shadow: 0 0 20px rgba(43, 108, 176, 0.12);
-}
-
-/* ── Other row hover glows ── */
-.incidents-table tbody tr.effect-row:hover td {
-  background: var(--surface-hover);
-}
-
-/* ── Effects overlay ── */
-.effects-container {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  overflow: hidden;
-}
-
-/* ── Explosions ── */
-.explosion-particle {
-  position: absolute;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background: var(--color);
-  animation: explodeFull var(--duration) ease-out forwards;
-  animation-delay: var(--delay);
-  pointer-events: none;
-  opacity: 0;
-}
-
-@keyframes explodeFull {
-  0% {
-    opacity: 1;
-    transform: scale(0.2) translate(0, 0) rotate(0deg);
-  }
-  30% {
-    opacity: 1;
-    transform: scale(1.4) translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.4)) rotate(calc(var(--rot) * 0.3));
-  }
-  70% {
-    opacity: 0.8;
-    transform: scale(1) translate(var(--tx), var(--ty)) rotate(var(--rot));
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.3) translate(calc(var(--tx) * 1.3), calc(var(--ty) * 1.3 + 80px)) rotate(calc(var(--rot) * 1.5));
-  }
-}
-
-.screen-flash {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9998;
-  animation: flash 0.5s ease-out forwards;
-}
-
-.screen-flash.blue {
-  animation-name: flashBlue;
-}
-
-.screen-flash.strong {
-  animation-name: flashStrong;
-}
-
-@keyframes flashBlue {
-  0% { background: rgba(43, 108, 176, 0.15); }
-  100% { background: transparent; }
-}
-
-@keyframes flashStrong {
-  0% { background: rgba(26, 77, 133, 0.28); }
-  100% { background: transparent; }
-}
-
-/* ── Firework bursts ── */
-.firework-burst {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color);
-  animation: fireworkShoot var(--duration) ease-out forwards;
-  animation-delay: var(--delay);
-  opacity: 0;
-  box-shadow: 0 0 6px var(--color), 0 0 12px var(--color);
-}
-
-@keyframes fireworkShoot {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1);
-  }
-  60% {
-    opacity: 1;
-    transform: translate(var(--fx), var(--fy)) scale(1.5);
-  }
-  100% {
-    opacity: 0;
-    transform: translate(calc(var(--fx) * 1.1), calc(var(--fy) * 1.1 + 20px)) scale(0);
-  }
-}
-
 /* ── Responsive ── */
-@media (max-width: 1024px) {
-  .content-grid { grid-template-columns: 1fr; }
-}
-
 @media (max-width: 768px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .dashboard { padding: 16px; }
