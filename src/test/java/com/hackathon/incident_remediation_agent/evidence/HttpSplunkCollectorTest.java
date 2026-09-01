@@ -1,6 +1,8 @@
 package com.hackathon.incident_remediation_agent.evidence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -14,9 +16,12 @@ import java.time.Instant;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import com.hackathon.incident_remediation_agent.config.AgentProperties;
@@ -24,9 +29,13 @@ import com.hackathon.incident_remediation_agent.incident.IncidentAlert;
 
 class HttpSplunkCollectorTest {
 
-    private static final String BASE = "https://logs.example";
+    private static final String BASE = "https://splunk.example";
+
+    private static final String EXPORT = BASE + "/services/search/jobs/export";
 
     private static final String SEARCH_LINK = "https://splunk.example/app/search";
+
+    private static final String QUERY = "index=demo level=ERROR";
 
     private final IncidentAlert alert = new IncidentAlert(
         "01JDEMOEVENT",
@@ -49,8 +58,8 @@ class HttpSplunkCollectorTest {
     }
 
     @Test
-    void foldsTheEndpointResponseIntoLogEvidence() {
-        respondWith(readMockResponse());
+    void foldsTheSearchResultsIntoLogEvidence() {
+        respondWith(readExportResponse());
 
         LogEvidence evidence = collector.collect(alert);
 
@@ -61,10 +70,28 @@ class HttpSplunkCollectorTest {
         server.verify();
     }
 
+    /**
+     * The search has to reach Splunk as a generating command, scoped to the incident's service and
+     * to the window around it, or the export streams the whole account back.
+     */
+    @Test
+    void searchesTheIncidentServiceOverTheWindowAroundTheAlert() {
+        server.expect(requestTo(EXPORT))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer splunk-token"))
+            .andExpect(content().contentType(MediaType.APPLICATION_FORM_URLENCODED))
+            .andExpect(content().formData(form()))
+            .andRespond(withSuccess(readExportResponse(), MediaType.APPLICATION_JSON));
+
+        collector.collect(alert);
+
+        server.verify();
+    }
+
     /** The origin and entry-point frames are the only thing naming a file the fix could touch. */
     @Test
     void rendersTheExceptionFramesAsStackFrames() {
-        respondWith(readMockResponse());
+        respondWith(readExportResponse());
 
         LogEvidence evidence = collector.collect(alert);
 
@@ -85,11 +112,35 @@ class HttpSplunkCollectorTest {
     @Test
     void ignoresEventsThatAreNotErrors() {
         respondWith("""
-            [
-              {"level":"INFO","timestamp":"t1","logger":"l","message":"started"},
-              {"level":"error","timestamp":"t2","logger":"l","message":"boom"}
-            ]
+            {"preview":false,"result":{"level":"INFO","_time":"t1","logger":"l","message":"started"}}
+            {"preview":false,"result":{"level":"error","_time":"t2","logger":"l","message":"boom"}}
             """);
+
+        LogEvidence evidence = collector.collect(alert);
+
+        assertThat(evidence.errorCount()).isEqualTo(1);
+        assertThat(evidence.topError()).isEqualTo("boom");
+    }
+
+    /** Preview lines are partial results for a running search; the final lines repeat them. */
+    @Test
+    void ignoresPreviewResults() {
+        respondWith("""
+            {"preview":true,"result":{"level":"ERROR","_time":"t1","logger":"l","message":"boom"}}
+            {"preview":false,"result":{"level":"ERROR","_time":"t1","logger":"l","message":"boom"}}
+            """);
+
+        LogEvidence evidence = collector.collect(alert);
+
+        assertThat(evidence.errorCount()).isEqualTo(1);
+    }
+
+    /** Export streams, so a dropped connection leaves a half-written line after good results. */
+    @Test
+    void keepsTheResultsBeforeATruncatedLine() {
+        respondWith("""
+            {"preview":false,"result":{"level":"ERROR","_time":"t1","logger":"l","message":"boom"}}
+            {"preview":false,"result":{"level":"ERROR","_ti""");
 
         LogEvidence evidence = collector.collect(alert);
 
@@ -99,11 +150,11 @@ class HttpSplunkCollectorTest {
 
     /**
      * Empty evidence blanks {@code topError}, which classifies the incident as unknown and stops
-     * the AI path. A log outage must not abandon the run, and must not reach the model either.
+     * the AI path. A Splunk outage must not abandon the run, and must not reach the model either.
      */
     @Test
-    void collectsNoLogsWhenTheEndpointFails() {
-        server.expect(requestTo(BASE + "/fetchLogs")).andRespond(withServerError());
+    void collectsNoLogsWhenTheSearchFails() {
+        server.expect(requestTo(EXPORT)).andRespond(withServerError());
 
         LogEvidence evidence = collector.collect(alert);
 
@@ -114,8 +165,8 @@ class HttpSplunkCollectorTest {
     }
 
     @Test
-    void collectsNoLogsWhenTheResponseIsNotAnArray() {
-        respondWith("{\"error\":\"no such index\"}");
+    void collectsNoLogsWhenTheSearchMatchesNothing() {
+        respondWith("");
 
         LogEvidence evidence = collector.collect(alert);
 
@@ -124,20 +175,29 @@ class HttpSplunkCollectorTest {
     }
 
     private void respondWith(String body) {
-        server.expect(requestTo(BASE + "/fetchLogs"))
-            .andExpect(method(HttpMethod.GET))
-            .andRespond(withSuccess(body, MediaType.TEXT_HTML));
+        server.expect(requestTo(EXPORT))
+            .andExpect(method(HttpMethod.POST))
+            .andRespond(withSuccess(body, MediaType.APPLICATION_JSON));
+    }
+
+    private static MultiValueMap<String, String> form() {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("search", "search " + QUERY + " service=\"darsrftp-service-dev\"");
+        form.add("earliest_time", String.valueOf(Instant.parse("2026-08-21T15:55:00Z").getEpochSecond()));
+        form.add("latest_time", String.valueOf(Instant.parse("2026-08-21T16:40:00Z").getEpochSecond()));
+        form.add("output_mode", "json");
+        form.add("count", "500");
+        return form;
     }
 
     /**
-     * One trace lifted verbatim from what the mock endpoint returns — all three loggers and all
-     * three payload shapes ({@code exception}, {@code http}, {@code context}) — served with the
-     * endpoint's real {@code text/html} content type.
+     * One trace as the search export returns it — all three loggers, a trailing INFO event, and the
+     * nested exception fields flattened to the dotted names Splunk gives them.
      */
-    private static String readMockResponse() {
+    private static String readExportResponse() {
         try (InputStream stream = HttpSplunkCollectorTest.class
-            .getResourceAsStream("/splunk-fetch-logs.json")) {
-            assertThat(stream).as("missing /splunk-fetch-logs.json").isNotNull();
+            .getResourceAsStream("/splunk-search-export.json")) {
+            assertThat(stream).as("missing /splunk-search-export.json").isNotNull();
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
         }
         catch (IOException exception) {
@@ -151,8 +211,7 @@ class HttpSplunkCollectorTest {
             "P2UX5VH",
             null,
             null,
-            new AgentProperties.Splunk(baseUrl, "fixture-token",
-                "search index=demo level=ERROR", SEARCH_LINK),
+            new AgentProperties.Splunk(baseUrl, "splunk-token", QUERY, SEARCH_LINK),
             null,
             null,
             null,

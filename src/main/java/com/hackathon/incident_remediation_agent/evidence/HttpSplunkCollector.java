@@ -1,6 +1,8 @@
 package com.hackathon.incident_remediation_agent.evidence;
 
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,7 +11,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -22,22 +28,27 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Reads error events from an HTTP log endpoint and folds them into {@link LogEvidence}.
+ * Runs the configured search against the Splunk search API and folds the matching events into
+ * {@link LogEvidence}.
  *
- * <p>The endpoint is currently a Postman mock returning Splunk-shaped JSON: a flat array of events
- * carrying the service, pod and logger, where the events raised by the global exception handler
- * also carry an {@code exception} object with the type, message, origin frame and entry-point
- * frame. Those two frames are the only thing telling the model which file to open, so they are
- * rendered into the samples as stack frames rather than dropped.
+ * <p>The call is {@code POST /services/search/jobs/export}, the one Splunk endpoint that runs a
+ * search and streams its results in a single request — the alternative is create-job, poll for
+ * completion, then fetch results, which buys nothing here. Authentication is
+ * {@code Authorization: Bearer <agent.splunk.token>}, so the token has to be a Splunk
+ * authentication token rather than a HEC token: HEC only ingests, it cannot search.
  *
- * <p>The body is parsed from text rather than bound directly: the mock answers with
- * {@code Content-Type: text/html} whatever the request asks for, and no message converter will
- * bind that to JSON.
+ * <p>The search itself is {@code agent.splunk.query}, narrowed to the incident's own service and
+ * to the window around {@link IncidentAlert#triggeredAt()}. Everything else on the account would
+ * otherwise come back too, and the samples are what the model reads to decide which file to open.
  *
- * <p>Neither {@code agent.splunk.token} nor {@code agent.splunk.query} is sent. The mock accepts
- * neither. Both belong to the real Splunk search API, along with a different path.
+ * <p>Export answers with newline-delimited JSON, one {@code {"preview":…,"result":{…}}} object per
+ * line rather than one JSON document, so the body is split on newlines and each line parsed on its
+ * own. Preview lines are dropped: they are partial results for a search still running, and would
+ * double-count events that the final lines repeat. Splunk flattens a JSON log event's nested
+ * fields with dotted names, so the exception frames arrive as {@code exception.origin} and
+ * {@code exception.entryPoint} — the only fields naming a file the fix could touch.
  *
- * <p>A failed, unparseable or empty fetch yields empty evidence rather than an exception, matching
+ * <p>A failed, unparseable or empty search yields empty evidence rather than an exception, matching
  * {@code SignalFlowSignalFxCollector}: a blank {@code topError} makes {@code EvidenceClassifier}
  * return {@code unknown}, which stops the AI path. Losing logs fails towards proposing nothing,
  * never towards proposing a blind fix.
@@ -48,9 +59,17 @@ public class HttpSplunkCollector implements SplunkCollector {
 
     private static final Logger log = LoggerFactory.getLogger(HttpSplunkCollector.class);
 
-    private static final String LOGS_PATH = "/fetchLogs";
+    /** Streams results as they are produced, so one request both runs and reads the search. */
+    private static final String EXPORT_PATH = "/services/search/jobs/export";
 
     private static final String ERROR_LEVEL = "ERROR";
+
+    /** Search window around the incident: enough before it to catch the first failing request. */
+    private static final Duration LOOKBACK = Duration.ofMinutes(30);
+    private static final Duration LOOKAHEAD = Duration.ofMinutes(15);
+
+    /** Splunk counts every matching event towards this, so it bounds the search, not the samples. */
+    private static final int MAX_EXPORTED_EVENTS = 500;
 
     /** Samples are quoted verbatim into a Jira comment and an AI prompt, so the list is bounded. */
     private static final int MAX_SAMPLED_EVENTS = 10;
@@ -67,12 +86,17 @@ public class HttpSplunkCollector implements SplunkCollector {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final RestClient restClient;
+    private final String query;
     private final URI searchUrl;
 
     HttpSplunkCollector(RestClient.Builder builder, AgentProperties properties) {
         AgentProperties.Splunk splunk = properties.splunk();
-        // A configured trailing slash would otherwise yield '...//fetchLogs'.
-        this.restClient = builder.baseUrl(splunk.baseUrl().replaceAll("/+$", "")).build();
+        this.restClient = builder
+            // A configured trailing slash would otherwise yield '...//services/search/jobs/export'.
+            .baseUrl(splunk.baseUrl().replaceAll("/+$", ""))
+            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + splunk.token())
+            .build();
+        this.query = splunk.query();
         this.searchUrl = splunk.searchLink() == null || splunk.searchLink().isBlank()
             ? null
             : URI.create(splunk.searchLink());
@@ -82,31 +106,64 @@ public class HttpSplunkCollector implements SplunkCollector {
     public LogEvidence collect(IncidentAlert alert) {
         List<JsonNode> errors = errorEvents(fetch(alert));
         if (errors.isEmpty()) {
-            log.warn("Log endpoint returned no ERROR events for incident {}", alert.incidentId());
+            log.warn("Splunk returned no ERROR events for incident {}", alert.incidentId());
             return NO_LOGS;
         }
         log.info("Collected {} ERROR events for incident {}", errors.size(), alert.incidentId());
         return new LogEvidence(errors.size(), topError(errors), samples(errors), this.searchUrl);
     }
 
-    private JsonNode fetch(IncidentAlert alert) {
+    private List<JsonNode> fetch(IncidentAlert alert) {
         try {
-            String body = this.restClient.get().uri(LOGS_PATH).retrieve().body(String.class);
-            log.info("Log endpoint {} returned {} characters for incident {}: {}", LOGS_PATH,
+            String body = this.restClient.post()
+                .uri(EXPORT_PATH)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(searchRequest(alert))
+                .retrieve()
+                .body(String.class);
+            log.info("Splunk {} returned {} characters for incident {}: {}", EXPORT_PATH,
                 body == null ? 0 : body.length(), alert.incidentId(),
                 body == null ? "<none>" : body);
-            return body == null || body.isBlank() ? null : this.objectMapper.readTree(body);
+            return results(body);
         }
         catch (RestClientException | JacksonException exception) {
-            log.warn("Log fetch failed for incident {}; collecting no logs. Response body: {}",
+            log.warn("Splunk search failed for incident {}; collecting no logs. Response body: {}",
                 alert.incidentId(), truncate(errorBody(exception)), exception);
-            return null;
+            return List.of();
         }
     }
 
     /**
-     * The error body, which {@code retrieve()} raises as an exception rather than returning. An
-     * expired mock answers 404 with a JSON explanation, and without this that explanation is lost.
+     * Times are sent as epoch seconds rather than a formatted timestamp: Splunk reads a bare number
+     * as absolute UTC, and any other form is interpreted in the search head's own time zone.
+     */
+    private MultiValueMap<String, String> searchRequest(IncidentAlert alert) {
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("search", search(alert));
+        form.add("earliest_time", String.valueOf(alert.triggeredAt().minus(LOOKBACK).getEpochSecond()));
+        form.add("latest_time", String.valueOf(alert.triggeredAt().plus(LOOKAHEAD).getEpochSecond()));
+        form.add("output_mode", "json");
+        form.add("count", String.valueOf(MAX_EXPORTED_EVENTS));
+        return form;
+    }
+
+    /**
+     * Splunk rejects a search that does not open with a generating command, and the configured
+     * query is written as a bare filter often enough to be worth prefixing here rather than in
+     * every environment's configuration.
+     */
+    private String search(IncidentAlert alert) {
+        String configured = this.query == null ? "" : this.query.trim();
+        String base = configured.startsWith("search ") || configured.startsWith("|")
+            ? configured
+            : "search " + configured;
+        return base + " service=\"" + alert.serviceName() + "\"";
+    }
+
+    /**
+     * The error body, which {@code retrieve()} raises as an exception rather than returning. Splunk
+     * answers a bad token with 401 and a {@code messages} array explaining it, and without this
+     * that explanation is lost.
      */
     private static String errorBody(Exception exception) {
         return exception instanceof HttpStatusCodeException status
@@ -123,17 +180,39 @@ public class HttpSplunkCollector implements SplunkCollector {
             : body.substring(0, MAX_LOGGED_ERROR_CHARACTERS) + "... (" + body.length() + " total)";
     }
 
-    private static List<JsonNode> errorEvents(JsonNode events) {
-        List<JsonNode> errors = new ArrayList<>();
-        if (events == null || !events.isArray()) {
-            return errors;
+    /**
+     * One event per line. A malformed line is skipped rather than failing the search: export
+     * streams, so a truncated connection leaves a half-written last line behind otherwise-good
+     * results.
+     */
+    private List<JsonNode> results(String body) {
+        List<JsonNode> events = new ArrayList<>();
+        if (body == null || body.isBlank()) {
+            return events;
         }
-        for (JsonNode event : events) {
-            if (ERROR_LEVEL.equalsIgnoreCase(event.path("level").asString(""))) {
-                errors.add(event);
+        for (String line : body.split("\\R")) {
+            if (line.isBlank()) {
+                continue;
+            }
+            JsonNode node;
+            try {
+                node = this.objectMapper.readTree(line);
+            }
+            catch (JacksonException exception) {
+                log.warn("Skipping unparseable Splunk export line: {}", truncate(line));
+                continue;
+            }
+            if (!node.path("preview").asBoolean(false) && node.path("result").isObject()) {
+                events.add(node.get("result"));
             }
         }
-        return errors;
+        return events;
+    }
+
+    private static List<JsonNode> errorEvents(List<JsonNode> events) {
+        return events.stream()
+            .filter(event -> ERROR_LEVEL.equalsIgnoreCase(event.path("level").asString("")))
+            .toList();
     }
 
     /**
@@ -143,7 +222,7 @@ public class HttpSplunkCollector implements SplunkCollector {
      */
     private static String topError(List<JsonNode> errors) {
         List<JsonNode> withException = errors.stream()
-            .filter(event -> event.path("exception").isObject())
+            .filter(HttpSplunkCollector::hasException)
             .toList();
 
         Map<String, Long> counts = new LinkedHashMap<>();
@@ -156,21 +235,20 @@ public class HttpSplunkCollector implements SplunkCollector {
             .orElse(null);
     }
 
-    /** Events are sampled in the order the endpoint returned them, which Splunk orders newest first. */
+    /** Events are sampled in the order Splunk returned them, which is newest first. */
     private static List<String> samples(List<JsonNode> errors) {
         List<String> lines = new ArrayList<>();
         errors.stream().limit(MAX_SAMPLED_EVENTS).forEach(event -> {
             lines.add("%s %s [%s] %s".formatted(
-                event.path("timestamp").asString(""),
+                field(event, "timestamp", "_time"),
                 event.path("level").asString(""),
-                event.path("logger").asString(""),
-                event.path("message").asString("")));
+                field(event, "logger", "logger_name"),
+                field(event, "message", "_raw")));
 
-            JsonNode exception = event.path("exception");
-            if (exception.isObject()) {
+            if (hasException(event)) {
                 lines.add(signature(event));
-                frame(lines, exception.path("origin").asString(""));
-                frame(lines, exception.path("entryPoint").asString(""));
+                frame(lines, field(event, "exception.origin", "exception_origin"));
+                frame(lines, field(event, "exception.entryPoint", "exception_entryPoint"));
             }
         });
         return List.copyOf(lines);
@@ -182,10 +260,24 @@ public class HttpSplunkCollector implements SplunkCollector {
         }
     }
 
+    private static boolean hasException(JsonNode event) {
+        return !field(event, "exception.type", "exception_type").isBlank();
+    }
+
     private static String signature(JsonNode event) {
-        JsonNode exception = event.path("exception");
-        return exception.isObject()
-            ? exception.path("type").asString("") + ": " + exception.path("message").asString("")
-            : event.path("message").asString("");
+        return hasException(event)
+            ? field(event, "exception.type", "exception_type") + ": "
+                + field(event, "exception.message", "exception_message")
+            : field(event, "message", "_raw");
+    }
+
+    /**
+     * A Splunk result is flat, and which name a nested field lands under depends on how the index
+     * extracts it — dotted for {@code spath}, underscored for a props.conf extraction — so both
+     * spellings are read.
+     */
+    private static String field(JsonNode event, String name, String alternative) {
+        String value = event.path(name).asString("");
+        return value.isBlank() ? event.path(alternative).asString("") : value;
     }
 }
